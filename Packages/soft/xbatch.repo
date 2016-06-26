@@ -1,0 +1,9 @@
+# xbatch.repo
+# including software: 
+# gcc,python-devel
+[xbatch]
+name=xbatch
+baseurl=file:///opt/packages_xbatch/
+gpgcheck=0
+enabled=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-CentOS-6
