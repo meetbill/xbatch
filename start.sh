@@ -78,7 +78,8 @@ import sys
 try:
     import paramiko
 except AttributeError:
-    os.system("""sed  -i '/You should rebuild using libgmp/d;/HAVE_DECL_MPZ_POWM_SEC/d'  /usr/lib64/python*/site-packages/Crypto/Util/number.py       /usr/lib/python*/site-packages/pycrypto*/Crypto/Util/number.py""")
+    print
+    #os.system("""sed  -i '/You should rebuild using libgmp/d;/HAVE_DECL_MPZ_POWM_SEC/d'  /usr/lib64/python*/site-packages/Crypto/Util/number.py       /usr/lib/python*/site-packages/pycrypto*/Crypto/Util/number.py""")
 except:
     sys.exit(1)
 EOF
@@ -107,7 +108,6 @@ EOFcrypto
 			exit
 		else
 			echo "安装pycropto完成"
-			cd ../../bin
 		fi
 	fi
 	echo "开始安装paramiko..."
@@ -120,7 +120,6 @@ EOFcrypto
 		echo "安装paramiko失败，请检查系统是否有gcc环境和python-devel环境"
 	else
 		echo "安装paramiko完成"
-		cd ../../bin
 	fi
 else
 	echo "paramiko已经就绪"
