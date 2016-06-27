@@ -73,6 +73,7 @@ function InstalEnv()
 {
 	##判断是否有paramiko
 cat<<EOF|python
+import os
 import sys
 try:
     import paramiko
