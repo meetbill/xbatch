@@ -1229,7 +1229,7 @@ def main():
     try:
         from optparse import OptionParser
         p=OptionParser()
-        p.add_option("-t",help="""Description: select excute type
+        p.add_option("-t","--excute-type",help="""Description: select excute type
             Parameter: [cmd|download|upload]\n
             cmd     : Excute Shell Command\n
             download: Download file\n

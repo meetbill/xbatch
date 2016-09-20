@@ -7,7 +7,6 @@ import shutil
 DIR_LOG='/var/log/xbatch'
 LogFile='%s/xbatch.log' %DIR_LOG
 SLogFile='%s/xbatch.source.log' %DIR_LOG
-#{{{log_write
 def log_write(ip,stderr,stdout,Logcmd,LogFile,useroot,username,UseLocalScript,Deployment,DeploymentStatus,OPTime):
     os.system("chmod 777 %s/* 2>/dev/null" %DIR_LOG)
     if DeploymentStatus:
@@ -22,12 +21,10 @@ def log_write(ip,stderr,stdout,Logcmd,LogFile,useroot,username,UseLocalScript,De
                 '===' + "su-root:"+useroot + '===' + "userscript:" + 
                 UseLocalScript + '===' + "Deployment:"+Deployment + '===' 
                 +"DeploymentStatus_T"+ DeploymentStatus_T + '===' + 
-                "Logcmd:"+Logcmd + '===' +"stderr:"+ stderr + '===' +"stdout:"+ stdout)
+                "Logcmd:"+Logcmd + '===' +"stderr:"+ stderr + '==='+ stdout)
         T.close()
     except Exception,e:
         print "Warning: Can't write log. (%s)" % e
-#}}}
-#{{{log_writesource
 def log_writesource(MSG):
     os.system("chmod 777 %s/* 2>/dev/null" %DIR_LOG)
     try:
@@ -36,12 +33,9 @@ def log_writesource(MSG):
         F.close()
     except Exception,e:
         print "Can not write to source log (%s)" % (e)
-#}}}
-#{{{log_flush
 def log_flush():
     #log_flush
     Log_Flag=time.strftime('%Y%m%d%H%M%S',time.localtime())
     if os.path.exists(LogFile):
         shutil.move('%s'%LogFile,'%s/xbatch%s.log'% (DIR_LOG,Log_Flag))
     #log_logrorate
-#}}}
