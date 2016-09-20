@@ -205,21 +205,22 @@ def Read_config(file="%s"%ConfFile):
         else:
             print "您尚未指定密码，程序退出"
             sys.exit()
-        for host in servers_allinfo:
-            if servers_allinfo[host]["password"] is None:
-                servers_allinfo[host]["password"]=SetPassword
+        for host in servers_info:
+            if servers_info[host]["password"] is None:
+                servers_info[host]["password"]=SetPassword
         NoPassword=False
     if Useroot=="Y":
         if NoRootPassword:
             SetRootPassword=getpass.getpass("请指定su-root的密码 (仅适用于您填写了None列的主机,没有填写None列的主机依然读取配置中的密码): ")
             if SetRootPassword:
                 print  "已指定su - root密码"
-                for host in servers_allinfo:
-                    if  servers_allinfo[host]["password"] is None:
-                        servers_allinfo[host]["password"]=SetRootPassword
+                for host in servers_info:
+                    if  servers_info[host]["password"] is None:
+                        servers_info[host]["password"]=SetRootPassword
             else:
                 print "您尚未指定su - root的密码,程序退出"
                 sys.exit()
+    # 返回机器群组和机器信息
     return HostsGroup,servers_info
     
 #}}}
@@ -1228,11 +1229,11 @@ def main():
     try:
         from optparse import OptionParser
         p=OptionParser()
-        p.add_option("-t","--excute-type",help="""Description: select excute type
-            Parameter: [cmd|download|upload]
-            cmd     : Excute Shell Command
-            download: Download file
-            upload  : Upload file
+        p.add_option("-t",help="""Description: select excute type
+            Parameter: [cmd|download|upload]\n
+            cmd     : Excute Shell Command\n
+            download: Download file\n
+            upload  : Upload file\n
             
             Example: %s -t cmd""" % sys.argv[0])
         p.add_option("-c","--cmd",help="cmd")
