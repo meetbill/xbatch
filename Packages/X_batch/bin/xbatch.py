@@ -6,7 +6,7 @@
 # (2)主机 servers_allinfo
 # (3)运行模式xbatch
 # (3)全局变量output_info
-VERSION=145
+VERSION=146
 import os
 import sys
 import mylog
@@ -14,7 +14,6 @@ import format_show
 import log_collect
 import command_tab
 import init_install
-#{{{config
 HOME='/opt/X_operations/X_batch'
 DIR_LOG='/var/log/xbatch'
 DIR_CONF='/etc/xbatch'
@@ -36,8 +35,6 @@ try:
     paramiko.util.log_to_file('%s/paramiko.log' %DIR_LOG)
 except Exception,e:
     pass
-#}}}
-#{{{Read_config
 def Read_config(file="%s"%ConfFile):
     global CONFMD5,Useroot,RunMode,Timeout,UseKey,sudo,Deployment,ListenFile,ListenTime,ListenChar
     global HOSTSMD5
@@ -222,9 +219,6 @@ def Read_config(file="%s"%ConfFile):
                 sys.exit()
     # 返回机器群组和机器信息
     return HostsGroup,servers_info
-    
-#}}}
-#{{{LocalScriptUpload
 def LocalScriptUpload(ip,port,username,password,s_file,d_file):
     try:        
         t = paramiko.Transport((ip,port))
@@ -241,14 +235,13 @@ def LocalScriptUpload(ip,port,username,password,s_file,d_file):
         return False    
     else:
         t.close()
-#}}}
-#{{{_SSH_cmd_执行程序部分
 def SSH_cmd(host_info,cmd,UseLocalScript,OPTime,show_output=True):
     ip=host_info["ip"]
     username=host_info["username"]
     port=host_info["port"]
     password=host_info["password"]
     global ListenLog
+    global output_all
     PROFILE=". /etc/profile 2>/dev/null;. ~/.bash_profile 2>/dev/null;. /etc/bashrc 2>/dev/null;. ~/.bashrc 2>/dev/null;"
     PATH="export PATH=$PATH:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin;"
     global All_Servers_num,All_Servers_num_all,All_Servers_num_Succ,Done_Status,Global_start_time,PWD,FailIP
@@ -282,7 +275,6 @@ def SSH_cmd(host_info,cmd,UseLocalScript,OPTime,show_output=True):
         for o in out:
             ResultSum +=o
             ResultSumLog +=o.strip('\n') + '\\n'
-        
         error_out=stderr.readlines()
         for err in error_out:
             ResultSum +=err
@@ -306,10 +298,8 @@ def SSH_cmd(host_info,cmd,UseLocalScript,OPTime,show_output=True):
                 else:
                     DeploymentInfo="Main commands excuted success, But deployment havn't check suncess info (%s) " %(ListenChar)
                     DeploymentStatus=False
-                    
-
             mylog.log_write(ip,error_out,ResultSumLog.strip('\\n') + '\n',cmd,LogFile,'N',username,UseLocalScript,Deployment,DeploymentStatus,OPTime)
-
+            output_all.append(out)
         Show_Result=ResultSum + '\n' +ResultSum_count
         TmpShow=format_show.Show_Char(Show_Result+"Time:"+OPTime,0)  
         mylog.log_writesource(TmpShow)
@@ -340,12 +330,11 @@ def SSH_cmd(host_info,cmd,UseLocalScript,OPTime,show_output=True):
             FailNumShow="\033[1m\033[1;31mFail:%d\033[1m\033[0m" % (FailNum)
         else:
             FailNumShow="Fail:%d" % (FailNum)
-        print "+Done (Succ:%d,%s, %0.2fSec X_batch(V:%d) )" % (All_Servers_num_Succ,FailNumShow,time.time()-Global_start_time,VERSION)
+        if show_output:
+            print "+Done (Succ:%d,%s, %0.2fSec X_batch(V:%d) )" % (All_Servers_num_Succ,FailNumShow,time.time()-Global_start_time,VERSION)
         All_Servers_num =0
         All_Servers_num_Succ=0
         Done_Status='end'
-#}}}
-#{{{Upload_file
 def Upload_file(host_info):
     ip=host_info["ip"]
     username=host_info["username"]
@@ -397,12 +386,9 @@ def Upload_file(host_info):
             FailNumShow="\033[1m\033[1;31mFail:%d\033[1m\033[0m" % (FailNum)
         else:
             FailNumShow="Fail:%d" % (FailNum)
-        
         print "+Done (Succ:%d,%s, %0.2fSec X_batch(V:%d) )" % (All_Servers_num_Succ,FailNumShow,time.time()-Global_start_time,VERSION)
         All_Servers_num =0
         All_Servers_num_Succ=0
-#}}}
-#{{{Download_file_regex
 def Download_file_regex(host_info):
     ip=host_info["ip"]
     username=host_info["username"]
@@ -448,8 +434,6 @@ def Download_file_regex(host_info):
         else:
             FailNumShow="Fail:%d" % (FailNum)
         print "+Done (Succ:%d,%s, %0.2fSec X_batch(V:%d))" % (All_Servers_num_Succ,FailNumShow,time.time()-Global_start_time,VERSION)
-#}}}
-#{{{Download_file
 def Download_file(host_info):
     ip=host_info["ip"]
     username=host_info["username"]
@@ -488,8 +472,6 @@ def Download_file(host_info):
         else:
             FailNumShow="Fail:%d" % (FailNum)   
         print "+Done (Succ:%d,%s, %0.2fSec X_batch(V:%d))" % (All_Servers_num_Succ,FailNumShow,time.time()-Global_start_time,VERSION)
-#}}}
-#{{{Excute_sudo
 def Excute_sudo(host_info,cmd,UseLocalScript,OPTime):
     s=host_info["ip"]
     username=host_info["username"]
@@ -606,14 +588,14 @@ def Excute_sudo(host_info,cmd,UseLocalScript,OPTime):
         All_Servers_num =0
         All_Servers_num_Succ=0
         Done_Status='end'
-#}}}
-#{{{_Excute_cmd_root
 def Excute_cmd_root(host_info,cmd,UseLocalScript,OPTime):
+    # 获取配置信息
     s=host_info["ip"]
     username=host_info["username"]
     Port=host_info["port"]
     Password=host_info["password"]
     Passwordroot=host_info["rootpassword"]
+    # 全局变量
     global All_Servers_num_all,All_Servers_num,All_Servers_num_Succ,Done_Status,bufflog,FailIP,PWD
     PWD=re.sub("/{2,}","/",PWD)
     Done_Status='start'
@@ -707,8 +689,6 @@ def Excute_cmd_root(host_info,cmd,UseLocalScript,OPTime):
         All_Servers_num =0
         All_Servers_num_Succ=0
         Done_Status='end'
-#}}}
-#{{{Excute_cmd
 def Excute_cmd(hostgroup_all,servers_allinfo):
     global All_Servers_num_all,All_Servers_num,All_Servers_num_Succ,Done_Status,ListenLog,Global_start_time,PWD,FailIP,ScriptFilePath,CONFMD5,HOSTSMD5
     global d_file,s_file
@@ -844,7 +824,6 @@ def Excute_cmd(hostgroup_all,servers_allinfo):
                             PWD=PWD.strip(";")+"/" +re.search("^[a-zA-Z].*",cmd.split()[1]).group()+";"
                         else:
                             PWD=cmd +";"
-                        
                         IS_PWD=True
                         continue
                 except Exception,e:
@@ -923,7 +902,6 @@ def Excute_cmd(hostgroup_all,servers_allinfo):
         # 空格无效
         if re.search("^ *$",cmd):
             continue
-
         # use system
         # 配置模式
         # ------------------------------------------------------------------------选择配置模式
@@ -937,7 +915,6 @@ def Excute_cmd(hostgroup_all,servers_allinfo):
                 UseSystem=True
                 CmdPrompt="%s" % (CmdPrompt_Config)
             continue
-
         #######################################################################################
         #
         # 配置模式下操作
@@ -998,7 +975,6 @@ def Excute_cmd(hostgroup_all,servers_allinfo):
                         print "您选定的服务器%s不在配置文件中，所以选定失败,请重新选定" % a
                         SelectFail=True
                         break
-                        
                 if SelectFail:
                     SelectFail=False
                     continue
@@ -1147,15 +1123,14 @@ def Excute_cmd(hostgroup_all,servers_allinfo):
         for host in servers_select:
             # 是否是多线程
             if RunMode.upper()=='M':
+                # 否使用su root切换账户
                 if Useroot=='Y':
                     a=threading.Thread(target=Excute_cmd_root,args=(servers_allinfo[host],Newcmd,UseLocalScript,OPTime))
-                    a.start()
+                elif sudo:
+                    a=threading.Thread(target=Excute_sudo,args=(servers_allinfo[host],Newcmd,UseLocalScript,OPTime))
                 else:
-                    if sudo:
-                        a=threading.Thread(target=Excute_sudo,args=(servers_allinfo[host],Newcmd,UseLocalScript,OPTime))
-                    else:
-                        a=threading.Thread(target=SSH_cmd,args=(servers_select[host],Newcmd,UseLocalScript,OPTime))
-                    a.start()
+                    a=threading.Thread(target=SSH_cmd,args=(servers_select[host],Newcmd,UseLocalScript,OPTime))
+                a.start()
                     
             else:
                 if Useroot=='Y':
@@ -1167,10 +1142,6 @@ def Excute_cmd(hostgroup_all,servers_allinfo):
                         Excute_sudo(servers_allinfo[host],Newcmd,UseLocalScript,OPTime)
                     else:
                         SSH_cmd(servers_select[host],Newcmd,UseLocalScript,OPTime)
-                            
-            ############################################################################################
-#}}}
-#{{{Excute_inspection()
 def Excute_inspection(servers_allinfo,Newcmd):
     global All_Servers_num_all,All_Servers_num,All_Servers_num_Succ,Done_Status,ListenLog,Global_start_time,PWD,FailIP,ScriptFilePath,CONFMD5,HOSTSMD5
     global ListenFile
@@ -1207,19 +1178,43 @@ def Excute_inspection(servers_allinfo,Newcmd):
                     Excute_sudo(servers_allinfo[host],Newcmd,UseLocalScript,OPTime)
                 else:
                     SSH_cmd(servers_allinfo[host],Newcmd,UseLocalScript,OPTime,False)
-                        
-        ############################################################################################
-#}}}
+def Excute_arch(servers_allinfo,Newcmd):
+    global All_Servers_num_all,All_Servers_num,All_Servers_num_Succ,Done_Status,ListenLog,Global_start_time,PWD,FailIP,ScriptFilePath,CONFMD5,HOSTSMD5
+    global ListenFile
+    global output_all
+    output_all = []
+    All_Servers_num_Succ=0
+    UseLocalScript='N' #
+    OPTime=time.strftime('%Y%m%d%H%M%S',time.localtime())
+    PWD='cd ~;'
+    FailIP=[]
+    All_Servers_num_all=len(servers_allinfo)
+    Global_start_time=time.time()
+    #----------------------------------------------------------------------------------------------
+    # 执行的程序
+    for host in servers_allinfo:
+        # 是否是多线程
+        if Useroot=='Y':
+            Excute_cmd_root(servers_allinfo[host],Newcmd,UseLocalScript,OPTime)
+        else:
+            if Deployment=='Y':
+                ListenLog="""if [ ! -r %s ] ; then echo -e '\033[1m\033[1;31m-ERR ListenFile %s  not exists,so do not excute commands !\033[1m\033[0m\a ' 1>&2 ;exit;else nohup tail -n 0 -f  %s  2&>%s &   fi;""" % (ListenFile,ListenFile,ListenFile,DeploymentFlag)
+            if sudo:
+                Excute_sudo(servers_allinfo[host],Newcmd,UseLocalScript,OPTime)
+            else:
+                SSH_cmd(servers_allinfo[host],Newcmd,UseLocalScript,OPTime,False)
+    return output_all
 #(1)cmd
 #(2)upload
 #(3)download
 #
-#{{{main
 def main():
     init_install.init_install(DIR_CONF,DIR_LOG,HOME)
     hostgroup_all,servers_allinfo=Read_config()
     global s_file,d_file,LocalScript,Global_start_time
     global All_Servers_num_Succ,All_Servers_num_all,All_Servers_num
+    global output_all
+    output_all = []
     All_Servers_num  =0
     All_Servers_num_Succ=0
     if not servers_allinfo:
@@ -1237,6 +1232,7 @@ def main():
             
             Example: %s -t cmd""" % sys.argv[0])
         p.add_option("-c","--cmd",help="cmd")
+        p.add_option("-x","--exe",help="exe")
         p.add_option("-s","--source-file",help="""Description:  Specific Source file  path
             Example:
                 %s  -t upload   -s /local/file  -d /remote/dir
@@ -1251,6 +1247,10 @@ def main():
             Notice: This parameter applies only to download""" % sys.argv[0])
         (option,args)=p.parse_args()
         Global_start_time=time.time()
+        if option.exe:
+            output = Excute_arch(servers_allinfo,option.exe)
+            print output
+            sys.exit()
         if option.excute_type == "cmd": 
             mylog.log_flush()
             Excute_inspection(servers_allinfo,option.cmd)
@@ -1299,7 +1299,6 @@ def main():
                 else:
                     a=threading.Thread(target=Download_file_regex,args=(servers_allinfo[host],))
                 a.start()
-
         # 不输入参数的话，会执行以下程序
         elif not option.excute_type:
             if not os.path.isfile("%s/flag/.NoTabAsk"%HOME):
@@ -1320,6 +1319,5 @@ def main():
         print "exit"
     except EOFError:
         print "exit"
-#}}}
 if  __name__=='__main__':
     main()

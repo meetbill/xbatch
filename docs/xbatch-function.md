@@ -60,3 +60,16 @@ Example:
 
 command line mode may operate all hosts.
 
+#### (4)-x
+
+这种模式是为了可以方便二次开发
+
+```
+#/usr/bin/xb -x "date"
+执行结果后会将所有机器得到的数据放到 output 变量中
+
+output = Excute_arch(servers_allinfo,option.exe)
+print output
+
+output 是个列表，output 中的每个元素也都是列表，元素的值为每个服务器获取到的值 
+```
