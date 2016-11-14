@@ -1,8 +1,11 @@
 ## xbatch-function
 
-+ Interactive mode(default)   
-
-+ cmd mode   
+* [Interactive mode](#interactive-mode)
+* [cmd](#cmd)
+	* [(1)upload](#1upload)
+	* [(2)download](#2download)
+	* [(3)cmd inspection](#3cmd-inspection)
+	* [(4)二次开发接口](#4二次开发接口)
 
 ### Interactive mode
 
@@ -54,19 +57,17 @@ Example:
 ```
 /usr/bin/xb -t cmd --cmd ls
 ```
-### the difference of interactive and cmd mode
+the interactive mode can select a specific host batch operation, but the command line mode may operate all hosts.
 
-(1)the interactive mode can select a specific host batch operation, but the 
-
-command line mode may operate all hosts.
-
-#### (4)-x
+#### (4)二次开发接口
 
 这种模式是为了可以方便二次开发
-
 ```
+#/usr/bin/xb -x "commands"
+
+如下
 #/usr/bin/xb -x "date"
-执行结果后会将所有机器得到的数据放到 output 变量中
+执行结果后会将所有机器得到的数据放到程序中的 output 变量中
 
 output = Excute_arch(servers_allinfo,option.exe)
 print output

@@ -6,7 +6,7 @@
 # (2)主机 servers_allinfo
 # (3)运行模式xbatch
 # (3)全局变量output_info
-VERSION=146
+VERSION=147
 import os
 import sys
 import mylog
@@ -271,7 +271,8 @@ def SSH_cmd(host_info,cmd,UseLocalScript,OPTime,show_output=True):
             stdin,stdout,stderr=ssh.exec_command(PWD+cmd)
         out=stdout.readlines()
         All_Servers_num += 1
-        print "\r"
+        if show_output:
+            print "\r"
         for o in out:
             ResultSum +=o
             ResultSumLog +=o.strip('\n') + '\\n'

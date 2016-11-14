@@ -1,5 +1,8 @@
 ## xbatch-config
 
+* [(1)Password](#1password)
+* [(2)Public Key(promote)默认](#2public-keypromote默认)
+
 modify the configuration file to add the main login configuration of remote host
 
 There are two ways to login to remote host
@@ -16,7 +19,7 @@ the column 5 can be set to None
 locallhost===22===root===your-root's-password===None
 ```
 
-### (2)Public Key(promote)
+### (2)Public Key(promote)默认
 
 config the file /etc/xbatch/xbatch.conf
 
