@@ -31,6 +31,8 @@ add UseKey=Y
 UseKey=Y
 ```
 
+修改需要管理的主机信息，配置文件为 /etc/xbatch/hosts
+
 config the file /etc/xbatch/hosts
 
 ```

@@ -1,76 +1,46 @@
 ## xbatch-function
 
-* [Interactive mode](#interactive-mode)
-* [cmd](#cmd)
-	* [(1)upload](#1upload)
-	* [(2)download](#2download)
-	* [(3)cmd inspection](#3cmd-inspection)
-	* [(4)二次开发接口](#4二次开发接口)
 
-### Interactive mode
+* [run xb](#run-xb)
+* [upload](#upload)
+* [download](#download)
+* [交互模式](#交互模式)
+* [二次开发接口](#二次开发接口)
 
-Interactive mode, you can bulk upload and download files, you can also execute
+### run xb
 
-commands on a remote host
+通过执行 xb 命令获取 xb 帮助手册
 
-just run:
+Execute xb for help
+
 ```
 xb
 ```
-When you select the interactive mode, you can "use sys" and "use ftp" to enter
 
-configuration mode and ftp mode, enter configuration mode and ftp mode can enter
+### upload
 
-"?" to display help information
+上传文件
 
-### cmd
+Usage:xb put local_file remote_dir
 
-run'xb -h' to display help information
-```
-xb -h
-```
-#### (1)upload
+### download
 
-Usage:xb -t upload -s sourcefile -d destination-file
+下载文件
 
-Example:
-```
-/usr/bin/xb  -t upload   -s /local/file  -d /remote/dir
-```
-#### (2)download
+Usage:xb get remote_file local_dir
 
-Usage:xb -t download -s sourcefile -d destination-file
+### 交互模式
 
-Example:
-```
- /usr/bin/xb  -t download -s /remote/file -d /local/dir
-```
-#### (3)cmd inspection
+Usage:xb cmd
 
-This mode is mainly used for timing tasks inspection, return results only
-
-recorded in the log, the contents are not displayed on the screen return
-
-Usage:xb -t cmd --cmd commands
-
-Example:
-```
-/usr/bin/xb -t cmd --cmd ls
-```
-the interactive mode can select a specific host batch operation, but the command line mode may operate all hosts.
-
-#### (4)二次开发接口
+### 二次开发接口
 
 这种模式是为了可以方便二次开发
 ```
-#/usr/bin/xb -x "commands"
+#/usr/bin/xb arch "commands"
 
 如下
-#/usr/bin/xb -x "date"
+#/usr/bin/xb arch "date"
 执行结果后会将所有机器得到的数据放到程序中的 output 变量中
-
-output = Excute_arch(servers_allinfo,option.exe)
-print output
-
 output 是个列表，output 中的每个元素也都是列表，元素的值为每个服务器获取到的值 
 ```

@@ -2,11 +2,11 @@
 #coding:utf8
 #Author=Bill
 # 变量说明(4类变量)
-# (1)主机群组hostgroup_all dict
-# (2)主机 servers_allinfo dict
+# (1)主机群组hostgroup_all
+# (2)主机 servers_allinfo
 # (3)运行模式xbatch
 # (3)全局变量output_info
-VERSION=150
+VERSION=147
 import os
 import sys
 import mylog
@@ -14,10 +14,6 @@ import format_show
 import log_collect
 import command_tab
 import init_install
-import subprocess
-import argparse
-from pprint import pprint
-from pydoc import render_doc
 HOME='/opt/X_operations/X_batch'
 DIR_LOG='/var/log/xbatch'
 DIR_CONF='/etc/xbatch'
@@ -223,11 +219,7 @@ def Read_config(file="%s"%ConfFile):
                 sys.exit()
     # 返回机器群组和机器信息
     return HostsGroup,servers_info
-def LocalScriptUpload(host_info,s_file,d_file):
-    ip=host_info["ip"]
-    username=host_info["username"]
-    port=host_info["port"]
-    password=host_info["password"]
+def LocalScriptUpload(ip,port,username,password,s_file,d_file):
     try:        
         t = paramiko.Transport((ip,port))
         if UseKey=='Y':
@@ -344,11 +336,7 @@ def SSH_cmd(host_info,cmd,UseLocalScript,OPTime,show_output=True):
         All_Servers_num =0
         All_Servers_num_Succ=0
         Done_Status='end'
-def Upload_file(host_info,local_file,remote_dir):
-    '''
-    local_file --> remote_dir
-    上传文件
-    '''
+def Upload_file(host_info):
     ip=host_info["ip"]
     username=host_info["username"]
     port=host_info["port"]
@@ -358,6 +346,8 @@ def Upload_file(host_info,local_file,remote_dir):
     global All_Servers_num_all
     global All_Servers_num_Succ
     global Global_start_time
+    global s_file
+    global d_file
     try:
         t = paramiko.Transport((ip,port))
         if UseKey=='Y':
@@ -374,14 +364,14 @@ def Upload_file(host_info,local_file,remote_dir):
             except EOFError:
                 print "Try use RunMode=D"
         sftp = paramiko.SFTPClient.from_transport(t)
-        New_d_file=re.sub('//','/',remote_dir + '/')+ os.path.split(local_file)[1]
+        New_d_file=re.sub('//','/',d_file + '/')+ os.path.split(s_file)[1]
         Bak_File=New_d_file+'.bak.'+"%d" % (int(time.strftime("%Y%m%d%H%M%S",time.localtime(Global_start_time))))
         try:
             sftp.rename(New_d_file,Bak_File)
             SftpInfo="Warning: %s %s  already exists,backed up to %s \n" % (ip,New_d_file,Bak_File)
         except Exception,e:
             SftpInfo='\n'
-        ret=sftp.put(local_file,New_d_file)
+        ret=sftp.put(s_file,New_d_file)
         All_Servers_num += 1
         All_Servers_num_Succ+=1
         print SftpInfo + "\033[1m\033[1;32m+OK [%s@%s] (%0.2f Sec %d/%d)\033[1m\033[0m" % (username,ip,time.time() - start_time,All_Servers_num,All_Servers_num_all)
@@ -445,7 +435,7 @@ def Download_file_regex(host_info):
         else:
             FailNumShow="Fail:%d" % (FailNum)
         print "+Done (Succ:%d,%s, %0.2fSec X_batch(V:%d))" % (All_Servers_num_Succ,FailNumShow,time.time()-Global_start_time,VERSION)
-def Download_file(host_info,remote_file,local_dir):
+def Download_file(host_info):
     ip=host_info["ip"]
     username=host_info["username"]
     port=host_info["port"]
@@ -453,6 +443,8 @@ def Download_file(host_info,remote_file,local_dir):
     global All_Servers_num_all
     global All_Servers_num
     global All_Servers_num_Succ
+    global s_file
+    global d_file
     start_time=time.time()
     try:
         t = paramiko.Transport((ip,port))
@@ -463,8 +455,8 @@ def Download_file(host_info,remote_file,local_dir):
         else:
             t.connect(username = username,password = password)
         sftp = paramiko.SFTPClient.from_transport(t)
-        New_d_file=re.sub('//','/',local_dir + '/')
-        ret=sftp.get(remote_file,"%s%s_%s" % (New_d_file,os.path.basename(remote_file),ip))
+        New_d_file=re.sub('//','/',d_file + '/')
+        ret=sftp.get(s_file,"%s%s_%s" % (New_d_file,os.path.basename(s_file),ip))
         All_Servers_num +=1
         All_Servers_num_Succ+=1
         print "\033[1m\033[1;32m+OK [%s@%s] (%0.2f Sec %d/%d)\033[1m\033[0m" % (username,ip,float(time.time()) - start_time,All_Servers_num,All_Servers_num_all)
@@ -716,6 +708,7 @@ def Excute_cmd(hostgroup_all,servers_allinfo):
     print "|Type 'flush logs     ' ----- flush the logs"
     print "|Type 'exit           ' ----- exit"
     print "|-----------------------------------------------------------"
+    #print "Servers" , Servers
     print ""
     Done_Status='end'
     All_Servers_num    =0
@@ -725,6 +718,8 @@ def Excute_cmd(hostgroup_all,servers_allinfo):
     IS_PWD=False
     UseSystem=False
     UseFtp=False
+    #Servers_T=Servers
+    servers_select=servers_allinfo
     FailIP=[];LastCMD=[]
     # 操作时提示字符
     #----------------------------------------------------------------CmdPrompt_Batch:分发命令提示符
@@ -738,32 +733,20 @@ def Excute_cmd(hostgroup_all,servers_allinfo):
     CmdPrompt_Config="\033[44;37mX_batch config\033[0m"
     CmdPrompt_Ftp="\033[42;37mX_batch ftp\033[0m"
     CmdPrompt=CmdPrompt_Batch
-    servers_select_ip = []
-    servers_select = {}
     #----------------------------------------------------------------CmdPrompt_Config:配置模式提示符
 
     while True:
+        All_Servers_num_all=len(servers_select)
 
         # 提示符prompt_group
         # 显示是哪个组
         #----------------------------------------------------------------prompt_group
-        # print "servers_select_ip",servers_select_ip
-        if not len(servers_select_ip):
-            for server_ip in servers_allinfo:
-                servers_select[server_ip] = servers_allinfo[server_ip]
-        else:
-            servers_select.clear()
-            for server_ip in servers_select_ip:
-                servers_select[server_ip] = servers_allinfo[server_ip]
-        # print "servers_select",servers_select
-        All_Servers_num_all=len(servers_select)
-
         prompt_group='IP'
         if not cmp(servers_select,servers_allinfo):
             prompt_group='All'
         else:
             for Group in hostgroup_all:
-                if not cmp(sorted(servers_select.keys()),sorted(hostgroup_all[Group])):
+                if not cmp(servers_select.keys(),hostgroup_all[Group]):
                     prompt_group=Group
         #----------------------------------------------------------------prompt_group_end
 
@@ -882,7 +865,10 @@ def Excute_cmd(hostgroup_all,servers_allinfo):
                     d_file='/tmp/' + os.path.basename(ScriptFilePath) + ScriptFlag
                     for host in servers_select:
                         d_file='/tmp/' + os.path.basename(ScriptFilePath) + ScriptFlag
-                        LocalScriptUpload(servers_allinfo[host],ScriptFilePath,d_file)
+                        if UseKey=="Y":
+                            LocalScriptUpload(host,servers_select[host]["port"],servers_select[host]["username"],None,ScriptFilePath,d_file)
+                        else:
+                            LocalScriptUpload(s,servers_select[host]["port"],servers_select[host]["username"],ScriptFilePath,d_file)
                     #Newcmd="""chmod a+x %s;%s;rm -f %s""" %(d_file,d_file,d_file)
                     ScriptFileCMD=re.sub(ScriptFilePath,d_file,' '.join(ScriptFileCMD))
                     Newcmd="""chmod a+x %s;%s;rm -f %s""" %(d_file,ScriptFileCMD,d_file)
@@ -942,13 +928,11 @@ def Excute_cmd(hostgroup_all,servers_allinfo):
                 print "当前可接受命令的主机 : %s" %servers_select.keys()
                 print """主机组:"""
                 for hostgroup in hostgroup_all:
-                    print "\t%s组主机: %s" % (hostgroup,hostgroup_all[hostgroup])
+                    print "\t%s组主机: %s" % (hostgroup,hostgroup_all[B])
                 if LastCMD:
                     print "执行命令%s失败的的主机   : %s" % (LastCMD,FailIP)
                 continue
-            # select
             elif re.search("^ *[Ss][Ee][Ll][Ee][Cc][Tt] *",cmd):
-                # FailIP
                 try:
                     SelectFailIP=cmd.split()[1]
                     T=re.search("[Ff][Aa][Ii][Ll] *",SelectFailIP)
@@ -956,33 +940,31 @@ def Excute_cmd(hostgroup_all,servers_allinfo):
                         if not FailIP:
                             print "当前没有执行命令失败的主机,无法选定"
                         else:
-                            servers_select_ip=FailIP
+                            servers_select=FailIP
                             print "已选定执行命令[%s]失败的主机%s" %(LastCMD,FailIP)
                         continue
                 except IndexError:
                     print  "您尚未选定主机 select 主机地址"
                     continue
                 SelectServer=re.sub("^ *[Ss][Ee][Ll][Ee][Cc][Tt] *| *","",cmd).lower()
-                # select all server
                 if re.search("^ *[Aa][Ll]{2} *",SelectServer):
                     servers_select=servers_allinfo
                     print "已选定所有主机: %s" % (servers_select)
                     continue
-                # select group
                 IsSelectHostsGroup=False
                 Host_I_Flag=True
                 Any_In_HostsGroup=False
-                for select_item in SelectServer.split(","):
-                    if select_item in hostgroup_all.keys():
+                for c in SelectServer.split(","):
+                    if c in hostgroup_all.keys():
                         if Host_I_Flag:
-                            servers_select_ip = hostgroup_all[select_item]
+                            servers_select=hostgroup_all[c]
                             Host_I_Flag=False
                         else:
-                            servers_select_ip = hostgroup_all[select_item]+servers_select_ip
+                            servers_select=hostgroup_all[c]+servers_select
                         IsSelectHostsGroup=True
                         Any_In_HostsGroup=True
                     elif Any_In_HostsGroup:
-                        print "您选定的当前主机组: [%s] 不在hosts配置文件中，请重新选定" % select_item
+                        print "您选定的当前主机组: [%s] 不在hosts配置文件中，请重新选定" % c
                         continue
                 if IsSelectHostsGroup:
                     print "您已经选定主机组 : %s" %servers_select
@@ -990,17 +972,17 @@ def Excute_cmd(hostgroup_all,servers_allinfo):
                     continue
                 SelectFail=False
                 for a in SelectServer.split(","):
-                    if not a in servers_allinfo:
+                    if not a in Servers:
                         print "您选定的服务器%s不在配置文件中，所以选定失败,请重新选定" % a
                         SelectFail=True
                         break
                 if SelectFail:
                     SelectFail=False
                     continue
-                servers_select_ip=[]
+                servers_select=[]
                 for a in SelectServer.split(','):
-                    servers_select_ip.append(a)
-                print "您选定的远程服务器是：",servers_select_ip
+                    servers_select.append(a)
+                print "您选定的远程服务器是：",servers_select
                 continue
             elif re.search("^ *[Nn][Oo] +[Ss] *",cmd):
                 UseSystem=False
@@ -1008,11 +990,11 @@ def Excute_cmd(hostgroup_all,servers_allinfo):
                 print "已退出配置模式"
                 continue
             elif re.search("^ *[Nn][Oo] +[Ss][Ee][Ll][Ee][Cc][Tt] *$",cmd):
-                servers_select=servers_allinfo
+                servers_select=Servers
                 print "取消选定主机"
                 continue
             elif re.search("^ *[Nn][Oo] +[Aa][Ll]{2} *$",cmd):
-                servers_select=servers_allinfo
+                servers_select=Servers
                 #UseSystem=False
                 print "已取消所有设置"
                 continue
@@ -1068,6 +1050,7 @@ def Excute_cmd(hostgroup_all,servers_allinfo):
                 UseFtp=True
                 CmdPrompt="%s" % (CmdPrompt_Ftp)
             continue
+
         #######################################################################################
         #
         # ftp模式下操作
@@ -1075,83 +1058,46 @@ def Excute_cmd(hostgroup_all,servers_allinfo):
         #######################################################################################
         #----------------------------------------------------------------------------------config_start
         if UseFtp:
-            if re.search("^ *[Pp][Uu][Tt] +",cmd):
-                local_file=cmd.split()[1]
-                if os.path.exists(local_file):
-                    print 'OK,the %s file exists.'%local_file
+            if re.search("^ *[Uu][Pp][Ll][Oo][Aa][Dd] +",cmd):
+                s_file=cmd.split()[1]
+                if os.path.exists(s_file):
+                    print 'OK,the %s file exists.'%s_file
                 else:
-                    print 'Sorry,I cannot find the %s file.'%local_file
+                    print 'Sorry,I cannot find the %s file.'%s_file
                     continue
-                # remote_dir is a dir
-                remote_dir = ShowPWD
-                if remote_dir == "~":
-                    remote_dir = "/root"
+                d_file = ShowPWD
+                if d_file == "~":
+                    d_file = "/root"
                 Global_start_time=time.time()
                 for host in servers_select:
                     if RunMode.upper()=='M':
-                        a=threading.Thread(target=Upload_file,args=(servers_allinfo[host],local_file,remote_dir))
+                        a=threading.Thread(target=Upload_file,args=(servers_allinfo[host],))
                         a.start()
                     else: 
-                        Upload_file(servers_allinfo[host],local_file,remote_dir)
+                        Upload_file(servers_allinfo[host])
                 continue
-            elif re.search("^ *[Gg][Ee][Tt] +",cmd):
-                remote_file=cmd.split()[1]
-                local_dir = os.getcwd()
-                if not os.path.isdir(local_dir):
+            elif re.search("^ *[Dd][Oo][Ww][Nn][Ll][Oo][Aa][Dd] +",cmd):
+                s_file=cmd.split()[1]
+                d_file = ShowPWD
+                if d_file == "~":
+                    d_file = "/root"
+                if not os.path.isdir(d_file):
                     print 'Recv location must be a directory'
                     sys.exit(1)
                 Global_start_time=time.time()
                 for host in servers_select:
-                    a=threading.Thread(target=Download_file,args=(servers_allinfo[host],remote_file,local_dir))
+                    a=threading.Thread(target=Download_file_regex,args=(servers_allinfo[host]))
                     a.start()
                 continue
             elif re.search("^ *\? *$",cmd) or re.search("^ *[Hh]([Ee][Ll][Pp])? *$",cmd):
                 print """ftp命令：
-    put\tfile\t\t//upload a file from  local machine to the remote machine
-    get\tfile\t\t//download a file from remote machine to the local machine
-    no\tftp\t\t//退出配置模式
-    
-    pwd\t\t\tprint your remote working directory
-    ------------------------------------------------
-    wls\t\t\tlist contents of a local directory
-    wpwd\t\tprint your local working directory
-    wcd\t\tchange and/or print local working directory
+    upload\tfile\t\t//upload a file from  local machine to the remote machine
+    download\tfile\t\t//download a file from remote machine to the local machine
+    no\t\tftp\t\t//退出配置模式
     """
                 continue
             elif re.search("^ *[Ll][Ss]",cmd):
                 print 
-            elif re.search("^ *[Pp][Ww][Dd]",cmd):
-                print  ShowPWD
-                continue
-            elif re.search("^ *[Ww][Ll][Ss]",cmd):
-                # wls
-                cmd = 'ls'
-                p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
-                if p.wait() == 0:
-                    val = p.stdout.read()
-                    print val
-                else:
-                    print "lls error"
-                continue
-            elif re.search("^ *[Ww][Pp][Ww][Dd]",cmd):
-                # wls
-                cmd = 'pwd'
-                p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
-                if p.wait() == 0:
-                    val = p.stdout.read()
-                    print
-                    print val
-                else:
-                    print "pwd error"
-                continue
-            elif re.search("^ *[Ww][Cc][Dd]",cmd):
-                # wcd
-                new_dir=cmd.split()[1]
-                if not os.path.isdir(new_dir):
-                    print 'must be a directory'
-                    continue
-                os.chdir(new_dir)
-                continue
             elif re.search("^ *[Nn][Oo] +[Ff] *",cmd):
                 UseFtp=False
                 CmdPrompt=CmdPrompt_Batch
@@ -1163,9 +1109,9 @@ def Excute_cmd(hostgroup_all,servers_allinfo):
                 continue
         else:
             IsBack=False
-            if re.search("^ *[Pp][Uu][Tt] *",cmd):
+            if re.search("^ *[Uu][Pp][Ll][Oo][Aa][Dd] *",cmd):
                 IsBack=True
-            elif re.search("^ *[Gg][Ee][Tt] *",cmd):
+            elif re.search("^ *[Dd][Oo][Ww][Nn][Ll][Oo][Aa][Dd] *",cmd):
                 IsBack=True
             elif re.search("^ *[Nn][Oo] +[Ff][Tt][Pp] *$",cmd):
                 IsBack=True
@@ -1197,128 +1143,182 @@ def Excute_cmd(hostgroup_all,servers_allinfo):
                         Excute_sudo(servers_allinfo[host],Newcmd,UseLocalScript,OPTime)
                     else:
                         SSH_cmd(servers_select[host],Newcmd,UseLocalScript,OPTime)
+def Excute_inspection(servers_allinfo,Newcmd):
+    global All_Servers_num_all,All_Servers_num,All_Servers_num_Succ,Done_Status,ListenLog,Global_start_time,PWD,FailIP,ScriptFilePath,CONFMD5,HOSTSMD5
+    global ListenFile
+    All_Servers_num_Succ=0
+    UseLocalScript='N' #
+    OPTime=time.strftime('%Y%m%d%H%M%S',time.localtime())
+    PWD='cd ~;'
+    FailIP=[]
+    All_Servers_num_all=len(servers_allinfo)
+    Global_start_time=time.time()
+    #----------------------------------------------------------------------------------------------
+    # 执行的程序
+    for host in servers_allinfo:
+        # 是否是多线程
+        if RunMode.upper()=='M':
+            if Useroot=='Y':
+                a=threading.Thread(target=Excute_cmd_root,args=(servers_allinfo[host],Newcmd,UseLocalScript,OPTime))
+                a.start()
+            else:
+                if sudo:
+                    a=threading.Thread(target=Excute_sudo,args=(servers_allinfo[host],Newcmd,UseLocalScript,OPTime))
+                else:
+                    #默认模式
+                    a=threading.Thread(target=SSH_cmd,args=(servers_allinfo[host],Newcmd,UseLocalScript,OPTime,False))
+                a.start()
+                
+        else:
+            if Useroot=='Y':
+                Excute_cmd_root(servers_allinfo[host],Newcmd,UseLocalScript,OPTime)
+            else:
+                if Deployment=='Y':
+                    ListenLog="""if [ ! -r %s ] ; then echo -e '\033[1m\033[1;31m-ERR ListenFile %s  not exists,so do not excute commands !\033[1m\033[0m\a ' 1>&2 ;exit;else nohup tail -n 0 -f  %s  2&>%s &   fi;""" % (ListenFile,ListenFile,ListenFile,DeploymentFlag)
+                if sudo:
+                    Excute_sudo(servers_allinfo[host],Newcmd,UseLocalScript,OPTime)
+                else:
+                    SSH_cmd(servers_allinfo[host],Newcmd,UseLocalScript,OPTime,False)
+def Excute_arch(servers_allinfo,Newcmd):
+    global All_Servers_num_all,All_Servers_num,All_Servers_num_Succ,Done_Status,ListenLog,Global_start_time,PWD,FailIP,ScriptFilePath,CONFMD5,HOSTSMD5
+    global ListenFile
+    global output_all
+    output_all = []
+    All_Servers_num_Succ=0
+    UseLocalScript='N' #
+    OPTime=time.strftime('%Y%m%d%H%M%S',time.localtime())
+    PWD='cd ~;'
+    FailIP=[]
+    All_Servers_num_all=len(servers_allinfo)
+    Global_start_time=time.time()
+    #----------------------------------------------------------------------------------------------
+    # 执行的程序
+    for host in servers_allinfo:
+        # 是否是多线程
+        if Useroot=='Y':
+            Excute_cmd_root(servers_allinfo[host],Newcmd,UseLocalScript,OPTime)
+        else:
+            if Deployment=='Y':
+                ListenLog="""if [ ! -r %s ] ; then echo -e '\033[1m\033[1;31m-ERR ListenFile %s  not exists,so do not excute commands !\033[1m\033[0m\a ' 1>&2 ;exit;else nohup tail -n 0 -f  %s  2&>%s &   fi;""" % (ListenFile,ListenFile,ListenFile,DeploymentFlag)
+            if sudo:
+                Excute_sudo(servers_allinfo[host],Newcmd,UseLocalScript,OPTime)
+            else:
+                SSH_cmd(servers_allinfo[host],Newcmd,UseLocalScript,OPTime,False)
+    return output_all
 #(1)cmd
 #(2)upload
 #(3)download
 #
+def main():
+    init_install.init_install(DIR_CONF,DIR_LOG,HOME)
+    hostgroup_all,servers_allinfo=Read_config()
+    global s_file,d_file,LocalScript,Global_start_time
+    global All_Servers_num_Succ,All_Servers_num_all,All_Servers_num
+    global output_all
+    output_all = []
+    All_Servers_num  =0
+    All_Servers_num_Succ=0
+    if not servers_allinfo:
+        print "当前没有配置服务器地址,请在%s/hosts文件中配置!" %DIR_CONF
+        sys.exit()
+    # (2)主程序
+    try:
+        from optparse import OptionParser
+        p=OptionParser()
+        p.add_option("-t","--excute-type",help="""Description: select excute type
+            Parameter: [cmd|download|upload]\n
+            cmd     : Excute Shell Command\n
+            download: Download file\n
+            upload  : Upload file\n
+            
+            Example: %s -t cmd""" % sys.argv[0])
+        p.add_option("-c","--cmd",help="cmd")
+        p.add_option("-x","--exe",help="exe")
+        p.add_option("-s","--source-file",help="""Description:  Specific Source file  path
+            Example:
+                %s  -t upload   -s /local/file  -d /remote/dir
+                %s  -t download -s /remote/file -d /local/dir""" %(sys.argv[0],sys.argv[0]))
+        p.add_option("-d","--destination-file",help="""
+            Description: Specific a destination directory Path""")
+        p.add_option("-r","--regex",action='store_false',default=True,help="""
+            Description: Use regex match filename
+            Example: 
+            %s  -t download -s '^/remote/tomcat/logs/localhost_2015-0[1-3].*log$' -d  /local/dir/
 
-class Xbatch():
-    '''
-    Xbatch is a tool for managing many machines
-    '''
-    def __init__(self):
-        init_install.init_install(DIR_CONF,DIR_LOG,HOME)
-        hostgroup_all,servers_allinfo=Read_config()
-        # print hostgroup_all
-        # print servers_allinfo
-        if not servers_allinfo:
-            print "当前没有配置服务器地址,请在%s/hosts文件中配置!" %DIR_CONF
-            sys.exit()
-        self.hostgroup_all = hostgroup_all
-        self.servers_allinfo = servers_allinfo
-        
-        #-------------------------------------------------------------------output
-        global All_Servers_num,All_Servers_num_Succ,All_Servers_num_all,Global_start_time
-        All_Servers_num_all=len(servers_allinfo)
-        All_Servers_num  =0
-        All_Servers_num_Succ=0
+            Notice: This parameter applies only to download""" % sys.argv[0])
+        (option,args)=p.parse_args()
         Global_start_time=time.time()
-
-        #arch
-        global output_all
-        output_all = []
-
-    def put(self,local_file,remote_dir):
-        '''
-        eg:xb put local_file remote_dir
-        '''
-        servers_allinfo = self.servers_allinfo
-        for host in servers_allinfo:
-            if RunMode.upper()=='M':
-                if UseKey=="Y":
-                    if  float(sys.version[:3])<2.6:
-                        Upload_file(servers_allinfo[host])
+        if option.exe:
+            output = Excute_arch(servers_allinfo,option.exe)
+            print output
+            sys.exit()
+        if option.excute_type == "cmd": 
+            mylog.log_flush()
+            Excute_inspection(servers_allinfo,option.cmd)
+            exit(1)
+        elif option.excute_type == "upload":
+            All_Servers_num_all=len(servers_allinfo)
+            if option.source_file and option.destination_file:
+                s_file=option.source_file
+                d_file=option.destination_file
+            else:
+                print "Upload File"
+                s_file=raw_input("Local Source Path>>>")
+                d_file=raw_input("Remote Destination Full-Path>>>")
+            for host in servers_allinfo:
+                if RunMode.upper()=='M':
+                    if UseKey=="Y":
+                        if  float(sys.version[:3])<2.6:
+                            Upload_file(servers_allinfo[host])
+                        else:
+                            a=threading.Thread(target=Upload_file,args=(servers_allinfo[host],))
+                            a.start()
                     else:
-                        a=threading.Thread(target=Upload_file,args=(servers_allinfo[host],local_file,remote_dir))
-                        a.start()
+                        if  float(sys.version[:3])<2.6:
+                            Upload_file(servers_allinfo[host])
+                        else:
+                            a=threading.Thread(target=Upload_file,args=(servers_allinfo[host],))
+                            a.start()
                 else:
-                    if  float(sys.version[:3])<2.6:
-                        Upload_file(servers_allinfo[host],local_file,remote_dir)
-                    else:
-                        a=threading.Thread(target=Upload_file,args=(servers_allinfo[host],local_file,remote_dir))
-                        a.start()
+                    Upload_file(servers_allinfo[host])
+        elif option.excute_type == "download":
+            All_Servers_num_all=len(servers_allinfo)
+            if option.source_file and option.destination_file:
+                s_file=option.source_file
+                d_file=option.destination_file
+                print d_file
             else:
-                Upload_file(servers_allinfo[host],local_file,remote_dir)
-    def get(self,remote_file,local_dir):
-        '''
-        eg:xb get remote_file local_dir
-        '''
-        if not os.path.isdir(local_dir):
-            print 'Recv location must be a directory'
-            sys.exit(1)
-        for host in self.servers_allinfo:
-            a=threading.Thread(target=Download_file,args=(self.servers_allinfo[host],remote_file,local_dir))
-            a.start()
-    def cmd(self):
-        '''
-        eg:xb cmd
-        '''
-        Excute_cmd(self.hostgroup_all,self.servers_allinfo)
-    def arch(self,commands):
-        '''
-        eg:xb arch "date"
-        '''
-        global PWD,FailIP
-        global output_all
-        output_all = []
-        All_Servers_num_Succ=0
-        UseLocalScript='N' #
-        OPTime=time.strftime('%Y%m%d%H%M%S',time.localtime())
-        PWD='cd ~;'
-        FailIP=[]
-        #----------------------------------------------------------------------------------------------
-        # 执行的程序
-        for host in self.servers_allinfo:
-            # 是否是多线程
-            SSH_cmd(self.servers_allinfo[host],commands,UseLocalScript,OPTime,False)
-        print output_all
-
+                print "Download File"
+                s_file=raw_input("Remote Source Full-Path>>>")
+                d_file=raw_input("Local Destination Path>>>")
+            if not os.path.isdir(d_file):
+                print 'Recv location must be a directory'
+                sys.exit(1)
+            for host in servers_allinfo:
+                if option.regex:
+                    a=threading.Thread(target=Download_file,args=(servers_allinfo[host],))
+                else:
+                    a=threading.Thread(target=Download_file_regex,args=(servers_allinfo[host],))
+                a.start()
+        # 不输入参数的话，会执行以下程序
+        elif not option.excute_type:
+            if not os.path.isfile("%s/flag/.NoTabAsk"%HOME):
+                TabAsk=raw_input("在新版本中，已经支持TAB补全功能，但是补全的依据是根据您当前所在的这个服务器上的路径为标准的，而并不是远程服务器上的路径，所以您需要确保使用TAB补全后，路径是正确的\n是否取消提示 (yes/no) ")
+                if re.search("^ *[Yy]([Ee][Ss])? *$",TabAsk):
+                    try:
+                        os.mknod("%s/flag/.NoTabAsk"%HOME)
+                        print "已取消提醒"
+                    except Exception,e:
+                        print "取消提醒失败(%s)" % e
+            # 执行的命令    
+            Excute_cmd(hostgroup_all,servers_allinfo)
+            sys.exit(0)
+        else:
+            print "Parameter does not currently support\t(%s)\a" % (option.excute_type)
+            Excute_cmd()
+    except KeyboardInterrupt:
+        print "exit"
+    except EOFError:
+        print "exit"
 if  __name__=='__main__':
-    xbatch = Xbatch()
-    parser=argparse.ArgumentParser(usage='\033[43;37mpython %(prog)s function param [options]\033[0m')
-    parser.add_argument("-c", "--config", dest="config", default=os.environ['HOME'] + '/.config',
-                      help="CONFIG file", metavar="CONFIG")
-    parser.add_argument("-s", "--section", dest="section", default='default',
-                      help="Section of config file to use file", metavar="SECTION")
-    options, unknown_args = parser.parse_known_args()
-    options = vars(options)
-    # print(options)
-    # print(unknown_args)
-    if not unknown_args:
-        #print parser.print_usage()
-        print(parser.print_help())
-        print(render_doc(Xbatch))
-        exit()
-    func = unknown_args.pop(0)
-    
-    try:
-        cmd = getattr(xbatch, func)
-    except:
-        print('No such function: %s' % func)
-        print(render_doc(Xbatch))
-        exit()
-
-    try:
-        kwargs = {}
-        func_args = []
-        for arg in unknown_args:
-            if '=' in arg:
-                key, value = arg.split('=', 1)
-                kwargs[key] = value
-            else:
-                func_args.append(arg)
-        func_args = tuple(func_args)
-        function_result = cmd(*func_args, **kwargs)
-    except TypeError:
-        print(render_doc(cmd))
-        exit()
+    main()
