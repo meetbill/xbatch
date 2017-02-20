@@ -2,34 +2,22 @@
 
 批量运维工具
 
-* [支持系统](#支持系统)
-* [table of Contents](#table-of-contents)
+* [使用手册](https://github.com/BillWang139967/xbatch/wiki)
 * [版本发布](#版本发布)
 * [小额捐款](#小额捐款)
-
-### 支持系统
-
-> * Centos 6.x
 
 ### 架构
 
 ```
-             +------+
-             |xbatch|
-             +------+
-           /     |    \
-     +-----+  +-----+  +-----+
-     |agent|  |agent|  |agent|
-     +-----+  +-----+  +-----+
+     +------+  +------+  +------+
+     |server|  |server|  |server|
+     +------+  +------+  +------+
+             \    |    /<-------------------------ssh
+               +------+
+               |xbatch|
+               +------+
 ```
 
-### table of Contents
-
-+ [1.Introduction](docs/introduction.md)
-+ [2.install](docs/xbatch-install.md)
-+ [3.config](docs/xbatch-config.md)
-+ [4.function](docs/xbatch-function.md)
- 
 ### 版本发布 
 
 * v1.5.0，2016-12-18, 修改启动方式，将批量上传修改为xshell的sftp样式
@@ -38,6 +26,6 @@
 
 ### 小额捐款
 
-如果你觉得xbatch对你有帮助, 可以对作者进行小额捐款(支付宝)
+如果你觉得xbatch对你有帮助, 可以对作者进行小额捐助(支付宝)
 
 ![Screenshot](images/5.jpg)
