@@ -6,7 +6,7 @@
 # (2)主机 servers_allinfo dict
 # (3)运行模式xbatch
 # (3)全局变量output_info
-VERSION=150
+VERSION=151
 import os
 import sys
 import mylog
@@ -344,7 +344,7 @@ def SSH_cmd(host_info,cmd,UseLocalScript,OPTime,show_output=True):
         All_Servers_num =0
         All_Servers_num_Succ=0
         Done_Status='end'
-def Upload_file(host_info,local_file,remote_dir):
+def Upload_file(host_info,local_file,remote_dir,backup=True):
     '''
     local_file --> remote_dir
     上传文件
@@ -376,10 +376,13 @@ def Upload_file(host_info,local_file,remote_dir):
         sftp = paramiko.SFTPClient.from_transport(t)
         New_d_file=re.sub('//','/',remote_dir + '/')+ os.path.split(local_file)[1]
         Bak_File=New_d_file+'.bak.'+"%d" % (int(time.strftime("%Y%m%d%H%M%S",time.localtime(Global_start_time))))
-        try:
-            sftp.rename(New_d_file,Bak_File)
-            SftpInfo="Warning: %s %s  already exists,backed up to %s \n" % (ip,New_d_file,Bak_File)
-        except Exception,e:
+        if backup:
+            try:
+                sftp.rename(New_d_file,Bak_File)
+                SftpInfo="Warning: %s %s  already exists,backed up to %s \n" % (ip,New_d_file,Bak_File)
+            except Exception,e:
+                SftpInfo='\n'
+        else:
             SftpInfo='\n'
         ret=sftp.put(local_file,New_d_file)
         All_Servers_num += 1
@@ -1227,7 +1230,6 @@ class Xbatch():
         #arch
         global output_all
         output_all = []
-
     def put(self,local_file,remote_dir):
         '''
         eg:xb put local_file remote_dir
@@ -1282,6 +1284,32 @@ class Xbatch():
             # 是否是多线程
             SSH_cmd(self.servers_allinfo[host],commands,UseLocalScript,OPTime,False)
         print output_all
+    def sync(self,local_file):
+        '''
+        eg:xb sync file
+        '''
+        servers_allinfo = self.servers_allinfo
+        print(servers_allinfo.keys())
+        #print(self.hostgroup_all)
+        remote_dir=os.path.dirname(local_file)
+        for host in servers_allinfo:
+            if host == '127.0.0.1':
+                continue
+            if RunMode.upper()=='M':
+                if UseKey=="Y":
+                    if  float(sys.version[:3])<2.6:
+                        Upload_file(servers_allinfo[host])
+                    else:
+                        a=threading.Thread(target=Upload_file,args=(servers_allinfo[host],local_file,remote_dir,False))
+                        a.start()
+                else:
+                    if  float(sys.version[:3])<2.6:
+                        Upload_file(servers_allinfo[host],local_file,remote_dir)
+                    else:
+                        a=threading.Thread(target=Upload_file,args=(servers_allinfo[host],local_file,remote_dir,False))
+                        a.start()
+            else:
+                Upload_file(servers_allinfo[host],local_file,remote_dir)
 
 if  __name__=='__main__':
     xbatch = Xbatch()
