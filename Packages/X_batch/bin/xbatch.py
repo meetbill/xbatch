@@ -6,7 +6,7 @@
 # (2)主机 servers_allinfo dict
 # (3)运行模式xbatch
 # (3)全局变量output_info
-VERSION=151
+VERSION=152
 import os
 import sys
 import mylog
@@ -16,11 +16,13 @@ import command_tab
 import init_install
 import subprocess
 import argparse
-from pprint import pprint
 from pydoc import render_doc
 HOME='/opt/X_operations/X_batch'
 DIR_LOG='/var/log/xbatch'
 DIR_CONF='/etc/xbatch'
+root_path = os.path.split(os.path.realpath(__file__))[0]
+os.chdir(root_path)
+print root_path
 try:
     import paramiko,hashlib,threading,socket,ConfigParser,time,re,getpass,random,getpass,readline
 except Exception,e:
@@ -1314,10 +1316,6 @@ class Xbatch():
 if  __name__=='__main__':
     xbatch = Xbatch()
     parser=argparse.ArgumentParser(usage='\033[43;37mpython %(prog)s function param [options]\033[0m')
-    parser.add_argument("-c", "--config", dest="config", default=os.environ['HOME'] + '/.config',
-                      help="CONFIG file", metavar="CONFIG")
-    parser.add_argument("-s", "--section", dest="section", default='default',
-                      help="Section of config file to use file", metavar="SECTION")
     options, unknown_args = parser.parse_known_args()
     options = vars(options)
     # print(options)
