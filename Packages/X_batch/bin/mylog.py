@@ -13,7 +13,7 @@ def log_write(ip,stderr,stdout,Logcmd,LogFile,useroot,username,UseLocalScript,OP
     try:
         T=open(LogFile,"a")
         T.write(ip+ '===' + "user:" +username  + '===' + "time:"+OPTime   + 
-                '===' + "su-root:"+useroot + '===' + "userscript:" + 
+                '===' + "useroot:"+useroot + '===' + "userscript:" + 
                 UseLocalScript + '===' + 
                 "Logcmd:"+Logcmd + '===' +"stderr:"+ stderr + '==='+ stdout)
         T.close()

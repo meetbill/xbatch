@@ -26,7 +26,6 @@ Useroot=N
 RunMode=M
 #请在%s/hosts中指定主机的账户名，密码，端口等信息
 #Timeout=3
-#sudo=sudo su - root
 UseKey=Y
 #Key的位置默认是在~/.sshd/id_rsa"""%dir_log)
         T.close()

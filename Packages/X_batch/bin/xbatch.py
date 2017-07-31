@@ -6,7 +6,7 @@
 # (2)主机 servers_allinfo dict
 # (3)运行模式xbatch
 # (3)全局变量output_info
-VERSION=153
+VERSION=154
 import os
 import sys
 import mylog
@@ -40,7 +40,7 @@ try:
 except Exception,e:
     pass
 def Read_config(file="%s"%ConfFile):
-    global CONFMD5,Useroot,RunMode,Timeout,UseKey,sudo
+    global CONFMD5,Useroot,RunMode,Timeout,UseKey
     global HOSTSMD5
     HostsGroup={}
     
@@ -82,15 +82,6 @@ def Read_config(file="%s"%ConfFile):
     except Exception,e:
         Timeout=socket.setdefaulttimeout(3)
     
-    #---------------------------------------------------------------config sudo
-    try:
-        sudo=config_file.get("X_batch","sudo")
-    except:
-        sudo=False
-    if Useroot=='Y'  and sudo:
-        print "您已经su-root了，不能再配置sudo，可以sudo=N后，使用su-root"
-        sys.exit(1)
-
     #---------------------------------------------------------------config UseKey
     try:
         UseKey=config_file.get("X_batch","UseKey").upper()
@@ -384,125 +375,9 @@ def Download_file(host_info,remote_file,local_dir):
         else:
             FailNumShow="Fail:%d" % (FailNum)   
         print "+Done (Succ:%d,%s, %0.2fSec X_batch(V:%d))" % (All_Servers_num_Succ,FailNumShow,time.time()-Global_start_time,VERSION)
-def Excute_sudo(host_info,cmd,UseLocalScript,OPTime):
-    s=host_info["ip"]
-    username=host_info["username"]
-    Port=host_info["port"]
-    Password=host_info["password"]
-    global All_Servers_num_all,All_Servers_num,All_Servers_num_Succ,Done_Status,bufflog,FailIP,PWD,sudo
-    PWD=re.sub("/{2,}","/",PWD)
-    Done_Status='start'
-    bufflog=''
-    start_time=time.time()
-    ResultSum=''
-    Result_status=False
-    sudoinfo=re.sub("^ *| *$","",sudo).split()
-    if username=='root':
-        print "不能用root登陆后再sudo登陆"
-        sys.exit()
-    elif sudoinfo[-1]=='-' or sudoinfo[-1]=='root' or  sudoinfo[-1]=='su':
-        prompt='# '
-    else:
-        prompt='$ '
-    try:
-        t=paramiko.SSHClient()
-        if UseKey=='Y':
-            KeyPath=os.path.expanduser('~/.ssh/id_rsa')
-            key=paramiko.RSAKey.from_private_key_file(KeyPath)
-            t.load_system_host_keys()
-            t.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            t.connect(s,Port,username,pkey=key) 
-        else:
-            t.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            t.connect(s,Port,username,Password)
-        ssh=t.invoke_shell()
-        ssh.send("LANG=zh_CN.UTF-8\n")
-        ssh.send("export LANG\n")
-        ssh.send("%s\n"%sudo)
-        buff=''
-        resp=''
-        info=''
-        EnterPassword=False
-        while True:
-            if re.search("\[sudo\] +password for.*:",resp):
-                ssh.send("%s\n"%Password)
-                while True:
-                    resp=ssh.recv(100)
-                    if re.search("Sorry, try again",resp):
-                        info='密码错误'
-                        break
-                    elif re.search('%s +.*sudoers'%username,resp):
-                        info="没有sudo权限"
-                        break
-                    elif resp.endswith(prompt):
-                        EnterPassword=True
-                        Result_status=True
-                        break
-            if EnterPassword:break
-            if buff.endswith(prompt):
-                Result_status=True
-                break
-            if re.search('%s +.*sudoers'%username,resp):
-                info="没有sudo权限"
-                break
-            resp=ssh.recv(9999)
-            buff += resp
-        if Result_status:
-            ssh.send("%s\n" % (PWD+cmd))
-            buff=""
-            bufflog=''
-            while not buff.endswith(prompt):
-                resp=ssh.recv(9999)
-                buff  += resp
-                bufflog  += resp.strip('\r\n') + '\\n'
-            t.close()
-            All_Servers_num += 1
-            buff='\n'.join(buff.split('\r\n')[1:][:-1])
-            ResultSum=buff + "\n\033[1m\033[1;32m+OK [%s@%s] (%0.2f Sec %d/%d)\033[1m\033[0m\n" % (username,s,float(time.time() - start_time),All_Servers_num,All_Servers_num_all)
-            
-            bufflog_new=''
-            for t in bufflog.split():
-                if t==cmd:
-                    continue
-                bufflog_new+=t
-            bufflog=bufflog_new
-            All_Servers_num_Succ+=1
-        else:
-            All_Servers_num += 1
-            FailIP.append(s)
-            #buff=''.join(buff.split('\r\n')[:-1])+'\n'
-            buff=''
-            
-            ResultSum=buff + "\n\033[1m\033[1;31m-ERR sudo Failed (%s) [%s@%s] (%0.2f Sec %d/%d)\033[1m\033[0m\n" % (info,username,s,float(time.time() - start_time),All_Servers_num,All_Servers_num_all)
-            
-    except Exception,e:
-        All_Servers_num += 1
-        Result_status=False
-        FailIP.append(s)
-        ResultSum="\n\033[1m\033[1;31m-ERR %s [%s@%s] (%0.2f Sec %d/%d)\033[1m\033[0m\a"   % (e,username,s,float(time.time() - start_time),All_Servers_num,All_Servers_num_all)
-        bufflog=str(e)
-    if Result_status:
-        mylog.log_write(s,'NULL',bufflog.strip('\\n') + '\n',cmd,LogFile,'Y',username,UseLocalScript,'N','N',OPTime)
-        TmpShow=format_show.Show_Char(ResultSum+"Time:"+OPTime,0)
-        mylog.log_writesource(TmpShow)
-    else:
-        mylog.log_write(s,bufflog.strip('\\n'),'NULL\n',cmd,LogFile,'Y',username,UseLocalScript,'N','N',OPTime)
-        TmpShow=format_show.Show_Char(ResultSum+"Time:"+OPTime,0)
-        mylog.log_writesource(TmpShow)
-    print TmpShow
-    if All_Servers_num_all == All_Servers_num:
-        FailNum=All_Servers_num_all-All_Servers_num_Succ
-        if FailNum>0:
-            FailNumShow="\033[1m\033[1;31mFail:%d\033[1m\033[0m" % (FailNum)
-        else:
-            FailNumShow="Fail:%d" % (FailNum)
-        print "+Done (Succ:%d,%s, %0.2fSec X_batch(V:%d))" % (All_Servers_num_Succ,FailNumShow,time.time()-Global_start_time,VERSION)
-        All_Servers_num =0
-        All_Servers_num_Succ=0
-        Done_Status='end'
 def Excute_cmd_root(host_info,cmd,UseLocalScript,OPTime):
     # 获取配置信息
-    s=host_info["ip"]
+    host_ip=host_info["ip"]
     username=host_info["username"]
     Port=host_info["port"]
     Password=host_info["password"]
@@ -522,33 +397,35 @@ def Excute_cmd_root(host_info,cmd,UseLocalScript,OPTime):
             key=paramiko.RSAKey.from_private_key_file(KeyPath)
             t.load_system_host_keys()
             t.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            t.connect(s,Port,username,pkey=key) 
+            t.connect(host_ip,Port,username,pkey=key) 
         else:
             t.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            t.connect(s,Port,username,Password)
+            t.connect(host_ip,Port,username,Password)
         ssh=t.invoke_shell()
         ssh.send("LANG=zh_CN.UTF-8\n")
         ssh.send("export LANG\n")
         if username=='root':
-            print "不能用root切换su-root"
-            sys.exit()
-        ssh.send("su - root\n")
-        buff=''
-        while not re.search("Password:",buff) and not re.search("：", buff):
-            resp=ssh.recv(9999)
-            buff += resp
-        ssh.send("%s\n" % (Passwordroot))
-        buff1=''
-        while True:
-            resp=ssh.recv(500)
-            buff1 += resp
-            if  re.search('su:',buff1):
-                break
-            else:
-                if re.search('# *$',buff1):
-                    Result_status=True
-                    All_Servers_num_Succ+=1
+            print "IP[%s]本身是root身份，不能用root切换su-root，故直接执行"%host_ip
+            All_Servers_num_Succ+=1
+            Result_status=True
+        else:
+            ssh.send("su - root\n")
+            buff=''
+            while not re.search("Password:",buff) and not re.search("：", buff):
+                resp=ssh.recv(9999)
+                buff += resp
+            ssh.send("%s\n" % (Passwordroot))
+            buff1=''
+            while True:
+                resp=ssh.recv(500)
+                buff1 += resp
+                if  re.search('su:',buff1):
                     break
+                else:
+                    if re.search('# *$',buff1):
+                        Result_status=True
+                        All_Servers_num_Succ+=1
+                        break
         if Result_status:
             ssh.send("%s\n" % (PWD+cmd))
             buff=""
@@ -560,7 +437,7 @@ def Excute_cmd_root(host_info,cmd,UseLocalScript,OPTime):
             t.close()
             All_Servers_num += 1
             buff='\n'.join(buff.split('\r\n')[1:][:-1])
-            ResultSum=buff + "\n\033[1m\033[1;32m+OK [%s@%s] (%0.2f Sec %d/%d)\033[1m\033[0m\n" % (username,s,float(time.time() - start_time),All_Servers_num,All_Servers_num_all)
+            ResultSum=buff + "\n\033[1m\033[1;32m+OK [%s@%s] (%0.2f Sec %d/%d)\033[1m\033[0m\n" % (username,host_ip,float(time.time() - start_time),All_Servers_num,All_Servers_num_all)
             
             bufflog_new=''
             for t in bufflog.split():
@@ -570,30 +447,31 @@ def Excute_cmd_root(host_info,cmd,UseLocalScript,OPTime):
             bufflog=bufflog_new
         else:
             All_Servers_num += 1
-            FailIP.append(s)
+            FailIP.append(host_ip)
             #buff=''.join(buff.split('\r\n')[:-1])+'\n'
             buff=''
             
-            ResultSum=buff + "\n\033[1m\033[1;31m-ERR Su Failed (Password Error) [%s@%s] (%0.2f Sec %d/%d)\033[1m\033[0m\n" % (username,s,float(time.time() - start_time),All_Servers_num,All_Servers_num_all)
+            ResultSum=buff + "\n\033[1m\033[1;31m-ERR Su Failed (Password Error) [%s@%s] (%0.2f Sec %d/%d)\033[1m\033[0m\n" % (username,host_ip,float(time.time() - start_time),All_Servers_num,All_Servers_num_all)
             
     except Exception,e:
         All_Servers_num += 1
         Result_status=False
-        FailIP.append(s)
-        ResultSum="\n\033[1m\033[1;31m-ERR %s [%s@%s] (%0.2f Sec %d/%d)\033[1m\033[0m\a"   % (e,username,s,float(time.time() - start_time),All_Servers_num,All_Servers_num_all)
+        FailIP.append(host_ip)
+        ResultSum="\n\033[1m\033[1;31m-ERR %s [%s@%s] (%0.2f Sec %d/%d)\033[1m\033[0m\a"   % (e,username,host_ip,float(time.time() - start_time),All_Servers_num,All_Servers_num_all)
         bufflog=str(e)
     if Result_status:
-        mylog.log_write(s,'NULL',bufflog.strip('\\n') + '\n',cmd,LogFile,'Y',username,UseLocalScript,'N','N',OPTime)
+        mylog.log_write(host_ip,'NULL',bufflog.strip('\\n') + '\n',cmd,LogFile,'Y',username,UseLocalScript,OPTime)
         TmpShow=format_show.Show_Char(ResultSum+"Time:"+OPTime,0)
         mylog.log_writesource(TmpShow)
     else:
-        mylog.log_write(s,bufflog.strip('\\n'),'NULL\n',cmd,LogFile,'Y',username,UseLocalScript,'N','N',OPTime)
+        mylog.log_write(host_ip,bufflog.strip('\\n'),'NULL\n',cmd,LogFile,'Y',username,UseLocalScript,OPTime)
         TmpShow=format_show.Show_Char(ResultSum+"Time:"+OPTime,0)
         mylog.log_writesource(TmpShow)
     print TmpShow
     if All_Servers_num_all == All_Servers_num:
         FailNum=All_Servers_num_all-All_Servers_num_Succ
         if FailNum>0:
+            print All_Servers_num_Succ
             FailNumShow="\033[1m\033[1;31mFail:%d\033[1m\033[0m" % (FailNum)
         else:
             FailNumShow="Fail:%d" % (FailNum)
@@ -632,8 +510,6 @@ def Excute_cmd(hostgroup_all,servers_allinfo):
     #----------------------------------------------------------------CmdPrompt_Batch:分发命令提示符
     if Useroot=="Y":
         CmdPrompt_Batch="X_batch root"
-    elif sudo:
-        CmdPrompt_Batch="X_batch sudo"
     else:
         CmdPrompt_Batch="X_batch"
     
@@ -1083,8 +959,6 @@ def Excute_cmd(hostgroup_all,servers_allinfo):
                 # 否使用su root切换账户
                 if Useroot=='Y':
                     a=threading.Thread(target=Excute_cmd_root,args=(servers_allinfo[host],Newcmd,UseLocalScript,OPTime))
-                elif sudo:
-                    a=threading.Thread(target=Excute_sudo,args=(servers_allinfo[host],Newcmd,UseLocalScript,OPTime))
                 else:
                     a=threading.Thread(target=SSH_cmd,args=(servers_select[host],Newcmd,UseLocalScript,OPTime))
                 a.start()
@@ -1093,10 +967,7 @@ def Excute_cmd(hostgroup_all,servers_allinfo):
                 if Useroot=='Y':
                     Excute_cmd_root(servers_allinfo[host],Newcmd,UseLocalScript,OPTime)
                 else:
-                    if sudo:
-                        Excute_sudo(servers_allinfo[host],Newcmd,UseLocalScript,OPTime)
-                    else:
-                        SSH_cmd(servers_select[host],Newcmd,UseLocalScript,OPTime)
+                    SSH_cmd(servers_select[host],Newcmd,UseLocalScript,OPTime)
 #(1)cmd
 #(2)upload
 #(3)download
