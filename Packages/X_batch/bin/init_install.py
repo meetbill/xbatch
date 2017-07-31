@@ -10,6 +10,7 @@
 """
 import os
 import commands
+import sys
 def init_install(dir_conf,dir_log,dir_home):
     file_hosts="%s/hosts" %dir_conf
     file_conf="%s/xbatch.conf" %dir_conf
@@ -27,11 +28,7 @@ RunMode=M
 #Timeout=3
 #sudo=sudo su - root
 UseKey=Y
-#Key的位置默认是在~/.sshd/id_rsa
-#Deployment=N
-#ListenFile=/var/log/messages
-#ListenTime=60
-#ListenChar=Server startup"""%dir_log)
+#Key的位置默认是在~/.sshd/id_rsa"""%dir_log)
         T.close()
     if not os.path.isfile('%s'%file_hosts):
         T=open('%s'%file_hosts,'w')

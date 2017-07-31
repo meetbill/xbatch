@@ -71,24 +71,7 @@ function InstallTOOL()
 #{{{InstalEnv
 function InstalEnv()
 {
-	##判断是否有paramiko
-cat<<EOF|python
-import os
-import sys
-try:
-    import paramiko
-except AttributeError:
-    print
-    os.system("""sed  -i '/You should rebuild using libgmp/d;/HAVE_DECL_MPZ_POWM_SEC/d'  /usr/lib64/python*/site-packages/Crypto/Util/number.py       /usr/lib/python*/site-packages/pycrypto*/Crypto/Util/number.py""")
-except:
-    sys.exit(1)
-EOF
-
-##################################################################
-if [ $? -ne 0 ]
-then
-    echo "当前没有paramiko"
-	cat<<EOFcrypto|python
+cat<<EOFcrypto|python
 import sys
 try:
 	import Crypto
@@ -110,20 +93,6 @@ EOFcrypto
 			echo "安装pycropto完成"
 		fi
 	fi
-	echo "开始安装paramiko..."
-	cd ${g_DIR_SOFT}
-	tar xf paramiko-1.9.0.tar.gz
-	cd paramiko-1.9.0
-	python setup.py install
-	if [ $? -ne 0 ]
-	then
-		echo "安装paramiko失败，请检查系统是否有gcc环境和python-devel环境"
-	else
-		echo "安装paramiko完成"
-	fi
-else
-	echo "paramiko已经就绪"
-fi
 ####################################################################
 cat<<EOFhashlib|python
 import sys

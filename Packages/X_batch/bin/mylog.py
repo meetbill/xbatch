@@ -7,20 +7,14 @@ import shutil
 DIR_LOG='/var/log/xbatch'
 LogFile='%s/xbatch.log' %DIR_LOG
 SLogFile='%s/xbatch.source.log' %DIR_LOG
-def log_write(ip,stderr,stdout,Logcmd,LogFile,useroot,username,UseLocalScript,Deployment,DeploymentStatus,OPTime):
+def log_write(ip,stderr,stdout,Logcmd,LogFile,useroot,username,UseLocalScript,OPTime):
     os.system("chmod 777 %s/* 2>/dev/null" %DIR_LOG)
-    if DeploymentStatus:
-        DeploymentStatus_T='Y'
-    else:
-        DeploymentStatus_T='N'
-    Deployment=Deployment.upper()
     
     try:
         T=open(LogFile,"a")
         T.write(ip+ '===' + "user:" +username  + '===' + "time:"+OPTime   + 
                 '===' + "su-root:"+useroot + '===' + "userscript:" + 
-                UseLocalScript + '===' + "Deployment:"+Deployment + '===' 
-                +"DeploymentStatus_T"+ DeploymentStatus_T + '===' + 
+                UseLocalScript + '===' + 
                 "Logcmd:"+Logcmd + '===' +"stderr:"+ stderr + '==='+ stdout)
         T.close()
     except Exception,e:

@@ -6,12 +6,11 @@
 # (2)主机 servers_allinfo dict
 # (3)运行模式xbatch
 # (3)全局变量output_info
-VERSION=152
+VERSION=153
 import os
 import sys
 import mylog
 import format_show
-import log_collect
 import command_tab
 import init_install
 import subprocess
@@ -24,7 +23,7 @@ root_path = os.path.split(os.path.realpath(__file__))[0]
 os.chdir(root_path)
 print root_path
 try:
-    import paramiko,hashlib,threading,socket,ConfigParser,time,re,getpass,random,getpass,readline
+    import paramiko,hashlib,threading,socket,ConfigParser,time,re,getpass,random
 except Exception,e:
     print "\033[1m\033[1;31m-ERR %s\033[0m\a"   % (e)
     sys.exit(1)
@@ -33,7 +32,6 @@ sys.setdefaultencoding('utf8')
 #------------------------------------log
 LogFile='%s/xbatch.log' %DIR_LOG
 SLogFile='%s/xbatch.source.log' %DIR_LOG
-DeploymentFlag="/tmp/DeploymentFlag%s" % (str(random.randint(999999999,999999999999)))
 #------------------------------------config
 HostsFile="%s/hosts" %DIR_CONF
 ConfFile="%s/xbatch.conf" %DIR_CONF
@@ -42,7 +40,7 @@ try:
 except Exception,e:
     pass
 def Read_config(file="%s"%ConfFile):
-    global CONFMD5,Useroot,RunMode,Timeout,UseKey,sudo,Deployment,ListenFile,ListenTime,ListenChar
+    global CONFMD5,Useroot,RunMode,Timeout,UseKey,sudo
     global HOSTSMD5
     HostsGroup={}
     
@@ -65,13 +63,7 @@ def Read_config(file="%s"%ConfFile):
         print e
         sys.exit(1)
     #---------------------------------------------------------------config Useroot
-    try:
-        Useroot=config_file.get("X_batch","Useroot").upper()
-        if Useroot=='Y' and Deployment=='Y':
-            print "In Deployment no support su  - root "
-            sys.exit(1)
-    except Exception,e:
-        Useroot="N"
+    Useroot=config_file.get("X_batch","Useroot").upper()
 
     #---------------------------------------------------------------config RunMode
     try:
@@ -105,31 +97,6 @@ def Read_config(file="%s"%ConfFile):
     except:
         UseKey="N"
 
-    #---------------------------------------------------------------config Deployment
-    try:
-        Deployment=config_file.get("X_batch","Deployment").upper()
-        if Deployment=='Y':
-            try:
-                ListenFile=config_file.get("X_batch","ListenFile")
-            except Exception,e:
-                print "In deployment mode ,must be specify ListenFile"
-                sys.exit(1)
-            try:
-                ListenTime=int(config_file.get("X_batch","ListenTime"))
-            except Exception,e:
-                print  "Warning : ListenTime default is 60"
-                ListenTime=60
-            try:
-                ListenChar=config_file.get("X_batch","ListenChar")
-            except Exception,e:
-                print "In deployment mode ,must be specify ListenChar"
-                sys.exit(1)
-    except Exception,e:
-        Deployment='N'
-    if RunMode=='M' and Deployment=='Y':
-        print "In Mutiple-threading mode,do not support deployment mode!"
-        sys.exit(1)
-            
     # (3)读取host配置文件
     try:
         host_file=open(HostsFile)
@@ -239,7 +206,7 @@ def LocalScriptUpload(host_info,s_file,d_file):
         else:
             t.connect(username = username,password = password)
         sftp = paramiko.SFTPClient.from_transport(t)
-        ret=sftp.put(s_file,d_file)
+        sftp.put(s_file,d_file)
     except Exception,e:     
         print "LocalScript inited Failed",e
         return False    
@@ -250,7 +217,6 @@ def SSH_cmd(host_info,cmd,UseLocalScript,OPTime,show_output=True):
     username=host_info["username"]
     port=host_info["port"]
     password=host_info["password"]
-    global ListenLog
     global output_all
     PROFILE=". /etc/profile 2>/dev/null;. ~/.bash_profile 2>/dev/null;. /etc/bashrc 2>/dev/null;. ~/.bashrc 2>/dev/null;"
     PATH="export PATH=$PATH:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin;"
@@ -258,15 +224,12 @@ def SSH_cmd(host_info,cmd,UseLocalScript,OPTime,show_output=True):
     start_time=time.time()
     ResultSum=''
     ResultSumLog=''
-    DeploymentStatus=False
-    DeploymentInfo=None
     PWD=re.sub("/{2,}","/",PWD)
     try:
         o=None
         err=None
         ssh=paramiko.SSHClient()
         if UseKey=='Y':
-    
             KeyPath=os.path.expanduser('~/.ssh/id_rsa')
             key=paramiko.RSAKey.from_private_key_file(KeyPath)
             ssh.load_system_host_keys()
@@ -275,10 +238,7 @@ def SSH_cmd(host_info,cmd,UseLocalScript,OPTime,show_output=True):
         else:
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             ssh.connect(ip,port,username,password)
-        if Deployment=='Y':
-            stdin,stdout,stderr=ssh.exec_command(PWD+ListenLog+cmd)
-        else:
-            stdin,stdout,stderr=ssh.exec_command(PWD+cmd)
+        stdin,stdout,stderr=ssh.exec_command(PWD+cmd)
         out=stdout.readlines()
         All_Servers_num += 1
         if show_output:
@@ -294,22 +254,12 @@ def SSH_cmd(host_info,cmd,UseLocalScript,OPTime,show_output=True):
             FailIP.append(ip)
             ResultSum_count="\033[1m\033[1;32m+OK [%s@%s] (%0.2f Sec, %d/%d \033[1m\033[1;31mCmd:Failed\033[1m\033[1;32m)\033[1m\033[0m" % (username,ip,float(time.time()-start_time),All_Servers_num,All_Servers_num_all)
             out='Null\n'
-            if Deployment=='Y':
-                DeploymentStatus=False
-            mylog.log_write(ip,ResultSumLog.strip('\\n'),out,cmd,LogFile,'N',username,UseLocalScript,Deployment,DeploymentStatus,OPTime)
+            mylog.log_write(ip,ResultSumLog.strip('\\n'),out,cmd,LogFile,'N',username,UseLocalScript,OPTime)
         else:
             error_out='NULL'
             ResultSum_count="\033[1m\033[1;32m+OK [%s@%s] (%0.2f Sec, %d/%d  Cmd:Sucess)\033[1m\033[0m" % (username,ip,float(time.time()-start_time),All_Servers_num,All_Servers_num_all)
             All_Servers_num_Succ+=1
-            if Deployment=='Y':
-                print  "Wating %s deployment (for %d Sec)..." % (ip,ListenTime)
-                T=log_collect.log_collect(ip,port,username,password,"""grep  -E "%s"  %s -q && echo  -n 'DoneSucc'""" % (ListenChar,DeploymentFlag),ListenTime,UseKey)
-                if T:
-                    DeploymentStatus=True
-                else:
-                    DeploymentInfo="Main commands excuted success, But deployment havn't check suncess info (%s) " %(ListenChar)
-                    DeploymentStatus=False
-            mylog.log_write(ip,error_out,ResultSumLog.strip('\\n') + '\n',cmd,LogFile,'N',username,UseLocalScript,Deployment,DeploymentStatus,OPTime)
+            mylog.log_write(ip,error_out,ResultSumLog.strip('\\n') + '\n',cmd,LogFile,'N',username,UseLocalScript,OPTime)
             output_all.append(out)
         Show_Result=ResultSum + '\n' +ResultSum_count
         TmpShow=format_show.Show_Char(Show_Result+"Time:"+OPTime,0)  
@@ -325,16 +275,9 @@ def SSH_cmd(host_info,cmd,UseLocalScript,OPTime,show_output=True):
         mylog.log_writesource(TmpShow)
         if show_output:
             print TmpShow
-        mylog.log_write(ip,str(e),'NULL\n',cmd,LogFile,'N',username,UseLocalScript,Deployment,DeploymentStatus,OPTime)
+        mylog.log_write(ip,str(e),'NULL\n',cmd,LogFile,'N',username,UseLocalScript,OPTime)
     else:
         ssh.close()
-    if Deployment=='Y' and not  DeploymentStatus:
-        while True:
-            TT=raw_input("%s Deployment not Success (%s) want contiue deployment next server (yes/no) ? " %(ip,DeploymentInfo))
-            if TT=='yes':
-                break
-            elif TT=='no':
-                sys.exit(1)
     if All_Servers_num == All_Servers_num_all: #这里防止计数器永远相加下去
         FailNum=All_Servers_num_all-All_Servers_num_Succ
         if FailNum>0:
@@ -386,7 +329,7 @@ def Upload_file(host_info,local_file,remote_dir,backup=True):
                 SftpInfo='\n'
         else:
             SftpInfo='\n'
-        ret=sftp.put(local_file,New_d_file)
+        sftp.put(local_file,New_d_file)
         All_Servers_num += 1
         All_Servers_num_Succ+=1
         print SftpInfo + "\033[1m\033[1;32m+OK [%s@%s] (%0.2f Sec %d/%d)\033[1m\033[0m" % (username,ip,time.time() - start_time,All_Servers_num,All_Servers_num_all)
@@ -405,51 +348,6 @@ def Upload_file(host_info,local_file,remote_dir,backup=True):
         print "+Done (Succ:%d,%s, %0.2fSec X_batch(V:%d) )" % (All_Servers_num_Succ,FailNumShow,time.time()-Global_start_time,VERSION)
         All_Servers_num =0
         All_Servers_num_Succ=0
-def Download_file_regex(host_info):
-    ip=host_info["ip"]
-    username=host_info["username"]
-    port=host_info["port"]
-    password=host_info["password"]
-    global All_Servers_num_all
-    global All_Servers_num
-    global All_Servers_num_Succ
-    global s_file
-    global d_file
-    start_time=time.time()
-    try:
-        t = paramiko.Transport((ip,port))
-        if UseKey=='Y':
-            KeyPath=os.path.expanduser('~/.ssh/id_rsa')
-            key=paramiko.RSAKey.from_private_key_file(KeyPath)
-            t.connect(username = username,pkey=key)
-        else:
-            t.connect(username = username,password = password)
-        sftp = paramiko.SFTPClient.from_transport(t)
-        t_get=sftp.listdir(os.path.dirname(s_file))
-        for getfilename in t_get:
-            if re.search(os.path.basename(s_file),getfilename):
-                download_fullpath=os.path.join(os.path.dirname(s_file),getfilename)
-                try:
-                    ret=sftp.get(download_fullpath,"%s_%s" % (os.path.join(d_file,getfilename),ip))
-                    print  '\t\033[1m\033[1;32m+OK [%s@%s] : %s' % (username,ip,download_fullpath)
-                except Exception,e:
-                    print  '\t\033[1m\033[1;33m-Failed %s : %s %s' % (ip,download_fullpath,e)
-        All_Servers_num +=1
-        All_Servers_num_Succ+=1
-        print "\033[1m\033[1;32m+OK [%s@%s] (%0.2f Sec %d/%d)\033[1m\033[0m" % (username,ip,float(time.time()) - start_time,All_Servers_num,All_Servers_num_all)
-    except Exception,e:
-        All_Servers_num +=1
-        print "\033[1m\033[1;31m-ERR [%s@%s] %s (%0.2f Sec  %d/%d)\033[1m\033[0m" % (username,ip,e,float(time.time() - start_time),All_Servers_num,All_Servers_num_all)
-    else:
-        t.close()
-    if All_Servers_num_all == All_Servers_num:
-        All_Servers_num = 0
-        FailNum=All_Servers_num_all-All_Servers_num_Succ
-        if FailNum>0:
-            FailNumShow="\033[1m\033[1;31mFail:%d\033[1m\033[0m" % (FailNum)
-        else:
-            FailNumShow="Fail:%d" % (FailNum)
-        print "+Done (Succ:%d,%s, %0.2fSec X_batch(V:%d))" % (All_Servers_num_Succ,FailNumShow,time.time()-Global_start_time,VERSION)
 def Download_file(host_info,remote_file,local_dir):
     ip=host_info["ip"]
     username=host_info["username"]
@@ -469,7 +367,7 @@ def Download_file(host_info,remote_file,local_dir):
             t.connect(username = username,password = password)
         sftp = paramiko.SFTPClient.from_transport(t)
         New_d_file=re.sub('//','/',local_dir + '/')
-        ret=sftp.get(remote_file,"%s%s_%s" % (New_d_file,os.path.basename(remote_file),ip))
+        sftp.get(remote_file,"%s%s_%s" % (New_d_file,os.path.basename(remote_file),ip))
         All_Servers_num +=1
         All_Servers_num_Succ+=1
         print "\033[1m\033[1;32m+OK [%s@%s] (%0.2f Sec %d/%d)\033[1m\033[0m" % (username,ip,float(time.time()) - start_time,All_Servers_num,All_Servers_num_all)
@@ -704,9 +602,8 @@ def Excute_cmd_root(host_info,cmd,UseLocalScript,OPTime):
         All_Servers_num_Succ=0
         Done_Status='end'
 def Excute_cmd(hostgroup_all,servers_allinfo):
-    global All_Servers_num_all,All_Servers_num,All_Servers_num_Succ,Done_Status,ListenLog,Global_start_time,PWD,FailIP,ScriptFilePath,CONFMD5,HOSTSMD5
+    global All_Servers_num_all,All_Servers_num,All_Servers_num_Succ,Done_Status,Global_start_time,PWD,FailIP,ScriptFilePath,CONFMD5,HOSTSMD5
     global d_file,s_file
-    global ListenFile
 
     # 读取完配置后显示的欢迎信息
     print "|-----------------------------------------------------------"
@@ -1196,8 +1093,6 @@ def Excute_cmd(hostgroup_all,servers_allinfo):
                 if Useroot=='Y':
                     Excute_cmd_root(servers_allinfo[host],Newcmd,UseLocalScript,OPTime)
                 else:
-                    if Deployment=='Y':
-                        ListenLog="""if [ ! -r %s ] ; then echo -e '\033[1m\033[1;31m-ERR ListenFile %s  not exists,so do not excute commands !\033[1m\033[0m\a ' 1>&2 ;exit;else nohup tail -n 0 -f  %s  2&>%s &   fi;""" % (ListenFile,ListenFile,ListenFile,DeploymentFlag)
                     if sudo:
                         Excute_sudo(servers_allinfo[host],Newcmd,UseLocalScript,OPTime)
                     else:
@@ -1214,8 +1109,8 @@ class Xbatch():
     def __init__(self):
         init_install.init_install(DIR_CONF,DIR_LOG,HOME)
         hostgroup_all,servers_allinfo=Read_config()
-        # print hostgroup_all
-        # print servers_allinfo
+        #print hostgroup_all
+        #print servers_allinfo
         if not servers_allinfo:
             print "当前没有配置服务器地址,请在%s/hosts文件中配置!" %DIR_CONF
             sys.exit()
@@ -1283,7 +1178,6 @@ class Xbatch():
         #----------------------------------------------------------------------------------------------
         # 执行的程序
         for host in self.servers_allinfo:
-            # 是否是多线程
             SSH_cmd(self.servers_allinfo[host],commands,UseLocalScript,OPTime,False)
         print output_all
     def sync(self,local_file):
