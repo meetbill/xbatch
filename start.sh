@@ -142,7 +142,8 @@ function InstallXbatch()
 	mkdir -p ${DIR_INSTALL}
     mkdir -p ${DIR_CONF}
 	cp -fr ./Packages/X_batch/* ${DIR_INSTALL} 2>/dev/null
-	cp ./Packages/conf/* ${DIR_CONF}
+    [[ ! -f "${DIR_CONF}/hosts" ]] && cp ./Packages/conf/hosts ${DIR_CONF}
+    [[ ! -f "${DIR_CONF}/xbatch.conf" ]] && cp ./Packages/conf/xbatch.conf ${DIR_CONF}
     chmod 777 ${DIR_INSTALL}/bin/xbatch.py
     if [[ -f "/usr/bin/xb" ]]
     then
