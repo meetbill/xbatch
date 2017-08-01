@@ -21,7 +21,6 @@ DIR_LOG='/var/log/xbatch'
 DIR_CONF='/etc/xbatch'
 root_path = os.path.split(os.path.realpath(__file__))[0]
 os.chdir(root_path)
-print root_path
 try:
     import paramiko,hashlib,threading,socket,ConfigParser,time,re,getpass,random
 except Exception,e:
