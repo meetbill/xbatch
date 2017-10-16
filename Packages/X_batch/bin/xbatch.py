@@ -6,7 +6,7 @@
 # (2)主机 servers_allinfo dict
 # (3)运行模式xbatch
 # (3)全局变量output_info
-VERSION=154
+VERSION=155
 import os
 import sys
 import mylog
@@ -22,7 +22,7 @@ DIR_CONF='/etc/xbatch'
 root_path = os.path.split(os.path.realpath(__file__))[0]
 os.chdir(root_path)
 try:
-    import paramiko,hashlib,threading,socket,ConfigParser,time,re,getpass,random
+    import paramiko,threading,socket,ConfigParser,time,re,getpass,random
 except Exception,e:
     print "\033[1m\033[1;31m-ERR %s\033[0m\a"   % (e)
     sys.exit(1)
@@ -44,12 +44,14 @@ def Read_config(file="%s"%ConfFile):
     HostsGroup={}
     
     # (1)查看是否有配置文件
-    try:
-        HOSTSMD5=hashlib.md5(open(HostsFile).read()).hexdigest()
-        CONFMD5=hashlib.md5(open(ConfFile).read()).hexdigest()
-    except Exception,e:
-        print "读取配置文件错误(%s)" % e
+    if  not os.path.exists(HostsFile):
+        print "读取配置文件错误"
         sys.exit(1)
+        print
+    if  not os.path.exists(ConfFile):
+        print "读取配置文件错误"
+        sys.exit(1)
+        print
     
     # (2)读取Config配置文件
     config_file=ConfigParser.ConfigParser()
@@ -564,12 +566,6 @@ def Excute_cmd(hostgroup_all,servers_allinfo):
         # 咱们要读取的命令
         # 提示符
         cmd=raw_input("%s [%s] %s>>>> " % (CmdPrompt,prompt_group,ShowPWD  ))
-        if HOSTSMD5!=hashlib.md5(open(HostsFile).read()).hexdigest():
-            Askreboot=raw_input("Hosts配置文件发生变化,重启程序[%s]才能生效 (yes/no)? " %sys.argv[0])
-            HOSTSMD5=hashlib.md5(open(HostsFile).read()).hexdigest()
-        elif CONFMD5!=hashlib.md5(open(ConfFile).read()).hexdigest():
-            Askreboot=raw_input("conf配置文件发生变化,重启程序[%s]才能生效 (yes/no)? " %sys.argv[0])
-            CONFMD5=hashlib.md5(open(ConfFile).read()).hexdigest()
         if re.search("^ *[Yy]([Ee][Ss])? *$",Askreboot):
             sys.exit()
         # 进行命令转换，尤其是交互式命令
@@ -1003,21 +999,7 @@ class Xbatch():
         '''
         servers_allinfo = self.servers_allinfo
         for host in servers_allinfo:
-            if RunMode.upper()=='M':
-                if UseKey=="Y":
-                    if  float(sys.version[:3])<2.6:
-                        Upload_file(servers_allinfo[host])
-                    else:
-                        a=threading.Thread(target=Upload_file,args=(servers_allinfo[host],local_file,remote_dir))
-                        a.start()
-                else:
-                    if  float(sys.version[:3])<2.6:
-                        Upload_file(servers_allinfo[host],local_file,remote_dir)
-                    else:
-                        a=threading.Thread(target=Upload_file,args=(servers_allinfo[host],local_file,remote_dir))
-                        a.start()
-            else:
-                Upload_file(servers_allinfo[host],local_file,remote_dir)
+            Upload_file(servers_allinfo[host],local_file,remote_dir)
     def get(self,remote_file,local_dir):
         '''
         eg:xb get remote_file local_dir
@@ -1061,21 +1043,7 @@ class Xbatch():
         for host in servers_allinfo:
             if host == '127.0.0.1':
                 continue
-            if RunMode.upper()=='M':
-                if UseKey=="Y":
-                    if  float(sys.version[:3])<2.6:
-                        Upload_file(servers_allinfo[host])
-                    else:
-                        a=threading.Thread(target=Upload_file,args=(servers_allinfo[host],local_file,remote_dir,False))
-                        a.start()
-                else:
-                    if  float(sys.version[:3])<2.6:
-                        Upload_file(servers_allinfo[host],local_file,remote_dir)
-                    else:
-                        a=threading.Thread(target=Upload_file,args=(servers_allinfo[host],local_file,remote_dir,False))
-                        a.start()
-            else:
-                Upload_file(servers_allinfo[host],local_file,remote_dir)
+            Upload_file(servers_allinfo[host],local_file,remote_dir)
 
 if  __name__=='__main__':
     xbatch = Xbatch()

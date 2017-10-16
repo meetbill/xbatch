@@ -1,6 +1,11 @@
 #!/bin/bash
-#Author=Bill
-#coding:utf-8
+#########################################################################
+# File Name: w.sh
+# Author: meetbill
+# mail: meetbill@163.com
+# Last Time: 2017-10-16 23:30:11
+#########################################################################
+
 export LANG=zh_CN.UTF-8
 g_DIR_CUR=$(pwd)
 g_DIR_PACK=${g_DIR_CUR}/Packages
@@ -87,40 +92,13 @@ EOFcrypto
 		python setup.py  install
 		if  [ $? -ne 0 ]
 		then
-			echo "安装pycropto失败，请检查系统是否有GCC编译环境,如果没有gcc环境，请安装: yum  install -y gcc 或者联系Q群:456335218"
+			echo "安装pycropto失败，请检查系统是否有GCC编译环境,如果没有gcc环境，请安装: yum  install -y gcc "
 			exit
 		else
 			echo "安装pycropto完成"
 		fi
 	fi
-####################################################################
-cat<<EOFhashlib|python
-import sys
-try:
-	import hashlib
-except:
-	sys.exit(1)
-EOFhashlib
-if [ $? -ne 0 ]
-then
-	echo "系统没有hashlib,正在安装"
-	cd ${g_DIR_SOFT}
-	unzip  hashlib-20081119.zip
-	cd hashlib-20081119
-	python setup.py install
-	if [ $? -ne 0 ]
-	then
-		echo "安装hashlib失败，请检查系统环境"
-		exit
-	else
-		echo "安装hashlib成功"
-		cd ../../bin
-	fi
-fi
-
-###############################################################
 }
-
 #}}}
 #{{{RmLocalYum
 function RmLocalYum()
