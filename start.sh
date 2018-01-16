@@ -145,4 +145,20 @@ function main()
 	RmLocalYum
 	InstallXbatch
 }
-main
+
+if [ $# == 0 ];then
+    echo "$0 --install_all/--install_only_xbatch"
+else
+    case $1 in
+        --install_all)
+            main
+            ;;
+        --install_only_xbatch)
+            InstallXbatch
+            ;;
+        *)
+            echo "$0 --install_all/--install_only_xbatch"
+            exit 1
+            ;;
+    esac
+fi

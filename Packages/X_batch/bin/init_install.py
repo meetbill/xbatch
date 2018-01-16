@@ -27,7 +27,8 @@ RunMode=M
 #请在%s/hosts中指定主机的账户名，密码，端口等信息
 #Timeout=3
 UseKey=Y
-#Key的位置默认是在~/.sshd/id_rsa"""%dir_log)
+ssh_key=~/.ssh/id_rsa
+#Key的位置默认是在~/.ssh/id_rsa"""%dir_log)
         T.close()
     if not os.path.isfile('%s'%file_hosts):
         T=open('%s'%file_hosts,'w')

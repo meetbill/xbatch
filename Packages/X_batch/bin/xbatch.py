@@ -6,15 +6,16 @@
 # (2)主机 servers_allinfo dict
 # (3)运行模式xbatch
 # (3)全局变量output_info
-VERSION=155
+VERSION=156
 import os
 import sys
 import mylog
 import format_show
-import command_tab
+import json
 import init_install
 import subprocess
 import argparse
+import traceback
 from pydoc import render_doc
 HOME='/opt/X_operations/X_batch'
 DIR_LOG='/var/log/xbatch'
@@ -31,6 +32,10 @@ sys.setdefaultencoding('utf8')
 #------------------------------------log
 LogFile='%s/xbatch.log' %DIR_LOG
 SLogFile='%s/xbatch.source.log' %DIR_LOG
+from mylib.BLog import Log
+debug=False
+logpath = "/tmp/xbatch_silent.log"
+logger = Log(logpath,level="debug",is_console=debug, mbs=5, count=5)
 #------------------------------------config
 HostsFile="%s/hosts" %DIR_CONF
 ConfFile="%s/xbatch.conf" %DIR_CONF
@@ -39,7 +44,7 @@ try:
 except Exception,e:
     pass
 def Read_config(file="%s"%ConfFile):
-    global CONFMD5,Useroot,RunMode,Timeout,UseKey
+    global CONFMD5,Useroot,RunMode,Timeout,UseKey,ssh_key
     global HOSTSMD5
     HostsGroup={}
     
@@ -88,6 +93,10 @@ def Read_config(file="%s"%ConfFile):
         UseKey=config_file.get("X_batch","UseKey").upper()
     except:
         UseKey="N"
+    try:
+        ssh_key=config_file.get("X_batch","ssh_key")
+    except:
+        ssh_key="~/.ssh/id_rsa"
 
     # (3)读取host配置文件
     try:
@@ -204,12 +213,69 @@ def LocalScriptUpload(host_info,s_file,d_file):
         return False    
     else:
         t.close()
-def SSH_cmd(host_info,cmd,UseLocalScript,OPTime,show_output=True):
+def SSH_cmd_silent(host_info,cmd,ssh_key=""):
     ip=host_info["ip"]
     username=host_info["username"]
     port=host_info["port"]
     password=host_info["password"]
     global output_all
+    PROFILE=". /etc/profile 2>/dev/null;. ~/.bash_profile 2>/dev/null;. /etc/bashrc 2>/dev/null;. ~/.bashrc 2>/dev/null;"
+    PATH="export PATH=$PATH:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin;"
+    global PWD
+    start_time=time.time()
+    ResultSum=''
+    ResultSumLog=''
+    PWD=re.sub("/{2,}","/",PWD)
+    try:
+        err=None
+        ssh=paramiko.SSHClient()
+        if ssh_key:
+            ssh_mode = "key"
+            KeyPath=os.path.expanduser(ssh_key)
+            key=paramiko.RSAKey.from_private_key_file(KeyPath)
+            ssh.load_system_host_keys()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            ssh.connect(ip,port,username,pkey=key)  
+        else:
+            ssh_mode = "password"
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            ssh.connect(ip,port,username,password)
+        stdin,stdout,stderr=ssh.exec_command(PWD+cmd)
+        out=stdout.readlines()
+        for o in out:
+            ResultSum +=o
+            ResultSumLog +=o.strip('\n') + '\\n'
+        error_out=stderr.readlines()
+        for err in error_out:
+            ResultSum +=err
+            ResultSumLog +=err.strip('\n') + '\\n'
+        if err:
+            exe_stat = "ERR"
+            output_all["failip_list"].append(ip)
+            output_all["return_msg"][ip]=""
+            err_info = ResultSum
+        else:
+            exe_stat = "OK"
+            err_info = ""
+            output_all["return_msg"][ip]=ResultSum
+    except Exception,e:
+        output_all["failip_list"].append(ip)
+        output_all["return_msg"][ip]= ""
+        err_info = traceback.format_exc()
+        exe_stat = "ERR"
+        #traceback.print_exc()
+    else:
+        ssh.close()
+    finally:
+        operation = "ssh:%s" % cmd
+        exe_time = "%0.2f Sec"%float(time.time()-start_time)
+        logger.debug("op:[%s] ip:[%s] stat:[%s] exe_time:[%s] ssh_mode:[%s] return_msg:[%s] err_info:[%s]" %(operation,ip,exe_stat,exe_time,ssh_mode,output_all["return_msg"][ip],err_info))
+
+def SSH_cmd(host_info,cmd,UseLocalScript,OPTime,show_output=True):
+    ip=host_info["ip"]
+    username=host_info["username"]
+    port=host_info["port"]
+    password=host_info["password"]
     PROFILE=". /etc/profile 2>/dev/null;. ~/.bash_profile 2>/dev/null;. /etc/bashrc 2>/dev/null;. ~/.bashrc 2>/dev/null;"
     PATH="export PATH=$PATH:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin;"
     global All_Servers_num,All_Servers_num_all,All_Servers_num_Succ,Done_Status,Global_start_time,PWD,FailIP
@@ -252,7 +318,6 @@ def SSH_cmd(host_info,cmd,UseLocalScript,OPTime,show_output=True):
             ResultSum_count="\033[1m\033[1;32m+OK [%s@%s] (%0.2f Sec, %d/%d  Cmd:Sucess)\033[1m\033[0m" % (username,ip,float(time.time()-start_time),All_Servers_num,All_Servers_num_all)
             All_Servers_num_Succ+=1
             mylog.log_write(ip,error_out,ResultSumLog.strip('\\n') + '\n',cmd,LogFile,'N',username,UseLocalScript,OPTime)
-            output_all.append(out)
         Show_Result=ResultSum + '\n' +ResultSum_count
         TmpShow=format_show.Show_Char(Show_Result+"Time:"+OPTime,0)  
         mylog.log_writesource(TmpShow)
@@ -340,6 +405,55 @@ def Upload_file(host_info,local_file,remote_dir,backup=True):
         print "+Done (Succ:%d,%s, %0.2fSec X_batch(V:%d) )" % (All_Servers_num_Succ,FailNumShow,time.time()-Global_start_time,VERSION)
         All_Servers_num =0
         All_Servers_num_Succ=0
+def Upload_file_silent(host_info,local_file,remote_dir,ssh_key="",backup=True):
+    '''
+    local_file --> remote_dir
+    上传文件
+    '''
+    global output_all
+    ip=host_info["ip"]
+    username=host_info["username"]
+    port=host_info["port"]
+    password=host_info["password"]
+    start_time=time.time()
+    try:
+        t = paramiko.Transport((ip,port))
+        if ssh_key:
+            ssh_mode = "key"
+            KeyPath=os.path.expanduser(ssh_key)
+            key=paramiko.RSAKey.from_private_key_file(KeyPath)
+            t.connect(username = username,pkey=key)
+            ##########################################
+        else:
+            ssh_mode = "password"
+            t.connect(username = username,password = password)
+        sftp = paramiko.SFTPClient.from_transport(t)
+        New_d_file=re.sub('//','/',remote_dir + '/')+ os.path.split(local_file)[1]
+        Bak_File=New_d_file+'.bak.'+"%d" % (int(time.strftime("%Y%m%d%H%M%S",time.localtime(start_time))))
+        if backup:
+            try:
+                sftp.rename(New_d_file,Bak_File)
+                SftpInfo="Warning: %s %s  already exists,backed up to %s \n" % (ip,New_d_file,Bak_File)
+            except Exception,e:
+                SftpInfo='\n'
+        else:
+            SftpInfo='\n'
+        sftp.put(local_file,New_d_file)
+        exe_stat = "OK"
+        output_all["return_msg"][ip]="upload file ok"
+        err_info = ""
+    except Exception,e:
+        output_all["failip_list"].append(ip)
+        output_all["return_msg"][ip]=""
+        err_info = traceback.format_exc()
+        exe_stat = "ERR"
+    else:
+        t.close()
+    finally:
+        operation="upload:%s --> %s"%(local_file,remote_dir)
+        exe_time = "%0.2f Sec"%float(time.time()-start_time)
+        logger.debug("operation:[%s] ip:[%s] stat:[%s] exe_time:[%s] ssh_mode:[%s] return_msg:[%s] err_info:[%s]" %(operation,ip,exe_stat,exe_time,ssh_mode,output_all["return_msg"][ip],err_info))
+
 def Download_file(host_info,remote_file,local_dir):
     ip=host_info["ip"]
     username=host_info["username"]
@@ -984,15 +1098,12 @@ class Xbatch():
         self.servers_allinfo = servers_allinfo
         
         #-------------------------------------------------------------------output
-        global All_Servers_num,All_Servers_num_Succ,All_Servers_num_all,Global_start_time
+        global All_Servers_num,All_Servers_num_Succ,Servers_num_all,Global_start_time
         All_Servers_num_all=len(servers_allinfo)
         All_Servers_num  =0
         All_Servers_num_Succ=0
         Global_start_time=time.time()
 
-        #arch
-        global output_all
-        output_all = []
     def put(self,local_file,remote_dir):
         '''
         eg:xb put local_file remote_dir
@@ -1014,24 +1125,90 @@ class Xbatch():
         '''
         eg:xb cmd
         '''
+        # 添加操作时路径 tab 键自动补全
+        import command_tab
         Excute_cmd(self.hostgroup_all,self.servers_allinfo)
-    def arch(self,commands):
+    def arch_ssh(self,hostgroup,commands):
         '''
-        eg:xb arch "date"
+        eg:xb arch_ssh "date"
         '''
-        global PWD,FailIP
         global output_all
-        output_all = []
-        All_Servers_num_Succ=0
-        UseLocalScript='N' #
-        OPTime=time.strftime('%Y%m%d%H%M%S',time.localtime())
+        output_all = {}
+        if hostgroup == "all":
+            servers_info = self.servers_allinfo
+        else:
+            if hostgroup in self.hostgroup_all.keys():
+                servers_info = {}
+                for ip in self.hostgroup_all[hostgroup]:
+                    servers_info[ip]=self.servers_allinfo[ip]
+            else:
+                output_all["stat"]="ERR"
+                output_all["return_msg"]={}
+                print output_all
+                return
+
+        global PWD
+        #UseKey,ssh_key
+        # 根据总结果输出
+        output_all["stat"]="OK"
+        output_all["fail_num"]=0
+        # 根据单次执行结果获取
+        output_all["failip_list"]=[]
+        output_all["return_msg"]={}
         PWD='cd ~;'
-        FailIP=[]
         #----------------------------------------------------------------------------------------------
         # 执行的程序
-        for host in self.servers_allinfo:
-            SSH_cmd(self.servers_allinfo[host],commands,UseLocalScript,OPTime,False)
-        print output_all
+        logger.debug("#####################################################")
+        logger.debug("ip_list:%s commands:%s"%(str(servers_info.keys()),commands))
+        for host in servers_info:
+            # 执行程序
+            if UseKey == "Y":
+                SSH_cmd_silent(self.servers_allinfo[host],commands,ssh_key)
+            else:
+                SSH_cmd_silent(self.servers_allinfo[host],commands)
+        output_all["fail_num"]=len(output_all["failip_list"])
+        if len(output_all["failip_list"]):
+            output_all["stat"]="ERR"
+        print json.dumps(output_all,indent=4)
+        logger.debug("=====================================================")
+        logger.debug("ip_list:%s commands:%s output_all:[%s]"%(str(servers_info.keys()),commands,output_all))
+    def arch_put(self,hostgroup,local_file,remote_dir):
+        '''
+        eg:xb arch_put hostgroup local_file remote_dir
+        '''
+        global output_all
+
+        # 总输出
+        output_all = {}
+        # 根据总结果输出
+        output_all["stat"]="OK"
+        output_all["fail_num"]=0
+        # 根据单次执行结果获取
+        output_all["failip_list"]=[]
+        output_all["return_msg"]={}
+        if hostgroup == "all":
+            servers_info = self.servers_allinfo
+        else:
+            if hostgroup in self.hostgroup_all.keys():
+                servers_info = {}
+                for ip in self.hostgroup_all[hostgroup]:
+                    servers_info[ip]=self.servers_allinfo[ip]
+            else:
+                output_all["stat"]="ERR"
+                print output_all
+                return
+        for host in servers_info:
+            if UseKey == "Y":
+                Upload_file_silent(servers_info[host],local_file,remote_dir,ssh_key=ssh_key)
+            else:
+                Upload_file_silent(servers_info[host],local_file,remote_dir)
+
+        output_all["fail_num"]=len(output_all["failip_list"])
+        if len(output_all["failip_list"]):
+            output_all["stat"]="ERR"
+        print json.dumps(output_all,indent=4)
+        logger.debug("=====================================================")
+        logger.debug("ip_list:%s op:%s output_all:[%s]"%(str(servers_info.keys()),"upload",output_all))
     def sync(self,local_file):
         '''
         eg:xb sync file
@@ -1077,6 +1254,6 @@ if  __name__=='__main__':
                 func_args.append(arg)
         func_args = tuple(func_args)
         function_result = cmd(*func_args, **kwargs)
-    except TypeError:
-        print(render_doc(cmd))
+    except Exception,e:
+        print traceback.format_exc()
         exit()
