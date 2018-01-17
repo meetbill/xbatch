@@ -6,7 +6,7 @@
 # (2)主机 servers_allinfo dict
 # (3)运行模式xbatch
 # (3)全局变量output_info
-VERSION="1.6.1"
+VERSION="1.6.2"
 # system
 import os
 import sys
@@ -1090,9 +1090,6 @@ class Xbatch():
         hostgroup_all,servers_allinfo=Read_config()
         #print hostgroup_all
         #print servers_allinfo
-        if not servers_allinfo:
-            print "当前没有配置服务器地址,请在%s/hosts文件中配置!" %DIR_CONF
-            sys.exit()
         self.hostgroup_all = hostgroup_all
         self.servers_allinfo = servers_allinfo
         
@@ -1124,6 +1121,9 @@ class Xbatch():
         '''
         eg:xb cmd
         '''
+        if not self.servers_allinfo:
+            print "当前没有配置服务器地址,请在%s/hosts文件中配置!" %DIR_CONF
+            sys.exit()
         # 添加操作时路径 tab 键自动补全
         import command_tab
         Excute_cmd(self.hostgroup_all,self.servers_allinfo)
@@ -1262,7 +1262,7 @@ class Xbatch():
         output_config["stat"]="OK"
         output_config["msg"]=""
         output_config["return_msg"]={}
-        output_all["version"]=VERSION
+        output_config["version"]=VERSION
 
         # 获取主机配置信息
         if operation == "get":
