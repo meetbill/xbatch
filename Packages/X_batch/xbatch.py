@@ -6,7 +6,7 @@
 # (2)主机 servers_allinfo dict
 # (3)运行模式xbatch
 # (3)全局变量output_info
-VERSION=160
+VERSION=161
 # system
 import os
 import sys
@@ -124,7 +124,7 @@ def Read_config(file="%s"%ConfFile):
             if len(host_info)<5:
                 print """您的配置文件中没有足够的列:\033[1m\033[1;31m[%s]\033[1m\033[0m\a
 请使用如下格式:
-主机地址===端口号===登陆账户===登陆密码===su-root密码，如果没有配置使用su-root，此列可为None""" % b.strip()
+主机地址===端口号===登陆账户===登陆密码===su-root密码，如果没有配置使用su-root，此列可为None""" % line.strip()
                 sys.exit()
             # 端口
             servers_info[host_info[0]]={}
@@ -1250,6 +1250,82 @@ class Xbatch():
             if host == '127.0.0.1':
                 continue
             Upload_file(servers_allinfo[host],local_file,remote_dir)
+    def hosts(self,operation,group_name="",ip_list="",user="",port=""):
+        """
+        eg:xb hosts set group_name "127.0.0.1 127.0.0.2" root 22
+        eg:xb hosts get
+        """
+        output_config = {}
+        # 根据总结果输出
+        output_config["stat"]="OK"
+        output_config["msg"]=""
+        output_config["return_msg"]={}
+
+        # 获取主机配置信息
+        if operation == "get":
+            hostgroup_all=self.hostgroup_all
+            output_config["stat"]="OK"
+            output_config["msg"]=""
+            output_config["return_msg"]=hostgroup_all
+            print output_config
+
+        # 生成主机配置信息
+        elif operation == "set":
+            hostgroup_all=self.hostgroup_all
+            # 判断参数是否有值
+            if not group_name or not ip_list or not user  or not port:
+                output_config["stat"]="ERR"
+                output_config["msg"]="args error"
+                print output_config
+                return 
+            # 判断主机组是否存在已有的列表中，如果存在，则添加至已有的的列表中，如果没有，则新增主机组
+            if group_name in hostgroup_all.keys():
+                # 判断新增的 IP 是否在主机组里有
+                ip_all = re.findall(r"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b", ip_list)
+                ip_add_list = []
+                for ip in ip_all:
+                    if ip not in hostgroup_all[group_name]:
+                        ip_add_list.append(ip)
+                # 判断第一行是否有主机组
+                lines = []
+                with open(HostsFile) as f:
+                    for line in f:
+                        if re.search("^#",line) or re.search("^ *$",line):
+                            lines.append(line)
+                            continue
+                        if re.search("^ *\[.*\] *$",line):
+                            lines.append(line)
+                            CurGroup=re.sub("^ *\[|\] *$","",line).strip().lower()
+                            if CurGroup == group_name:
+                                for ip in ip_add_list:
+                                    lines.append("%s===%s===%s===None===None\n"%(ip,port,user))
+                            else:
+                                continue
+                        else:
+                            lines.append(line)
+
+                with open(HostsFile,'w') as f:
+                    f.write(''.join(lines))
+            else:
+                # 判断新增的 IP 是否在主机组里有
+                ip_all = re.findall(r"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b", ip_list)
+                # 判断第一行是否有主机组
+                lines = []
+                with open(HostsFile) as f:
+                    for line in f:
+                        lines.append(line)
+                    lines.append("[%s]\n"%group_name)
+                    for ip in ip_all:
+                        lines.append("%s===%s===%s===None===None\n"%(ip,port,user))
+                with open(HostsFile,'w') as f:
+                    f.write(''.join(lines))
+            output_config["stat"]="OK"
+            output_config["msg"]=""
+            print output_config
+        else:
+            output_config["stat"]="ERR"
+            output_config["msg"]="args error"
+            print output_config
 
 if  __name__=='__main__':
     xbatch = Xbatch()
