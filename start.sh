@@ -122,13 +122,13 @@ function InstallXbatch()
 	cp -fr ./Packages/X_batch/* ${DIR_INSTALL} 2>/dev/null
     [[ ! -f "${DIR_CONF}/hosts" ]] && cp ./Packages/conf/hosts ${DIR_CONF}
     [[ ! -f "${DIR_CONF}/xbatch.conf" ]] && cp ./Packages/conf/xbatch.conf ${DIR_CONF}
-    chmod 777 ${DIR_INSTALL}/bin/xbatch.py
+    chmod 777 ${DIR_INSTALL}/xbatch.py
     if [[ -f "/usr/bin/xb" ]]
     then
         unlink /usr/bin/xb
-        ln -s ${DIR_INSTALL}/bin/xbatch.py /usr/bin/xb
+        ln -s ${DIR_INSTALL}/xbatch.py /usr/bin/xb
     else
-        ln -s ${DIR_INSTALL}/bin/xbatch.py /usr/bin/xb
+        ln -s ${DIR_INSTALL}/xbatch.py /usr/bin/xb
     fi
 	touch ${DIR_INSTALL}/flag/installed
     echo "Install [OK] ,please config the hosts file(/etc/xbatch/hosts)"

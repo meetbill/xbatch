@@ -14,7 +14,7 @@ import sys
 def init_install(dir_conf,dir_log,dir_home):
     file_hosts="%s/hosts" %dir_conf
     file_conf="%s/xbatch.conf" %dir_conf
-    INITDIR="%s %s/flag  %s %s/bin %s/version" %(dir_log,dir_home,dir_conf,dir_home,dir_home)
+    INITDIR="%s %s/flag  %s " %(dir_log,dir_home,dir_conf)
     if commands.getstatusoutput("mkdir -p %s 2>/dev/null" % (INITDIR))[0]!=0:
         print "Create Directory Failed"
         sys.exit(1)
@@ -25,7 +25,6 @@ def init_install(dir_conf,dir_log,dir_home):
 Useroot=N
 RunMode=M
 #请在%s/hosts中指定主机的账户名，密码，端口等信息
-#Timeout=3
 UseKey=Y
 ssh_key=~/.ssh/id_rsa
 #Key的位置默认是在~/.ssh/id_rsa"""%dir_log)

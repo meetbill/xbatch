@@ -6,36 +6,45 @@
 # (2)主机 servers_allinfo dict
 # (3)运行模式xbatch
 # (3)全局变量output_info
-VERSION=156
+VERSION=160
+# system
 import os
 import sys
-import mylog
-import format_show
 import json
-import init_install
 import subprocess
-import argparse
 import traceback
 from pydoc import render_doc
-HOME='/opt/X_operations/X_batch'
-DIR_LOG='/var/log/xbatch'
-DIR_CONF='/etc/xbatch'
+import threading
+import ConfigParser
+import time
+import re
+import getpass
+import random
+
 root_path = os.path.split(os.path.realpath(__file__))[0]
+sys.path.insert(0, os.path.join(root_path, 'mylib'))
 os.chdir(root_path)
-try:
-    import paramiko,threading,socket,ConfigParser,time,re,getpass,random
-except Exception,e:
-    print "\033[1m\033[1;31m-ERR %s\033[0m\a"   % (e)
-    sys.exit(1)
 reload(sys)
 sys.setdefaultencoding('utf8')
+
+# mylib
+import mylog
+import init_install
+import format_show
+import argparse
+import paramiko
+
+HOME = os.path.split(os.path.realpath(__file__))[0]
+DIR_LOG='/var/log/xbatch'
+DIR_CONF='/etc/xbatch'
 #------------------------------------log
 LogFile='%s/xbatch.log' %DIR_LOG
 SLogFile='%s/xbatch.source.log' %DIR_LOG
-from mylib.BLog import Log
+from BLog import Log
 debug=False
-logpath = "/tmp/xbatch_silent.log"
+logpath = "%s/xbatch_arch.log" %DIR_LOG
 logger = Log(logpath,level="debug",is_console=debug, mbs=5, count=5)
+
 #------------------------------------config
 HostsFile="%s/hosts" %DIR_CONF
 ConfFile="%s/xbatch.conf" %DIR_CONF
@@ -43,8 +52,9 @@ try:
     paramiko.util.log_to_file('%s/paramiko.log' %DIR_LOG)
 except Exception,e:
     pass
+
 def Read_config(file="%s"%ConfFile):
-    global CONFMD5,Useroot,RunMode,Timeout,UseKey,ssh_key
+    global CONFMD5,Useroot,RunMode,UseKey,ssh_key
     global HOSTSMD5
     HostsGroup={}
     
@@ -78,16 +88,6 @@ def Read_config(file="%s"%ConfFile):
         RunMode='M'
         print "No Runmode default Mutiple(M)"
 
-    #---------------------------------------------------------------config Timeout
-    try:
-        Timeout=config_file.get("X_batch","Timeout")
-        try:
-            Timeout=socket.setdefaulttimeout(int(Timeout))
-        except Exception,e:
-            Timeout=socket.setdefaulttimeout(3)
-    except Exception,e:
-        Timeout=socket.setdefaulttimeout(3)
-    
     #---------------------------------------------------------------config UseKey
     try:
         UseKey=config_file.get("X_batch","UseKey").upper()
@@ -168,7 +168,6 @@ def Read_config(file="%s"%ConfFile):
     except Exception,e:
         print "读取配置错误 %s (%s) "%(e,HostsFile)
         sys.exit(1)
-    os.system("""echo %s >%s/version/version 2>/dev/null"""%(VERSION,HOME))
     if NoPassword and UseKey=="N":
         SetPassword=getpass.getpass("请在此处为在密码列填写了[None]的主机指定密码,如果没有填写None的主机，密码依然读取配置文件中的信息(请确保您输入的密码适用于所有密码列填写了None的主机，否则请在配置文件%s/hosts文件中逐个指定)\n\033[1;33mHosts Password:\033[0m  "%DIR_CONF)
         if SetPassword:
@@ -1128,33 +1127,47 @@ class Xbatch():
         # 添加操作时路径 tab 键自动补全
         import command_tab
         Excute_cmd(self.hostgroup_all,self.servers_allinfo)
-    def arch_ssh(self,hostgroup,commands):
+    def arch_ssh(self,hosts,commands):
         '''
-        eg:xb arch_ssh "date"
+        eg:xb arch_ssh hosts "date"
         '''
         global output_all
         output_all = {}
-        if hostgroup == "all":
-            servers_info = self.servers_allinfo
-        else:
-            if hostgroup in self.hostgroup_all.keys():
-                servers_info = {}
-                for ip in self.hostgroup_all[hostgroup]:
-                    servers_info[ip]=self.servers_allinfo[ip]
-            else:
-                output_all["stat"]="ERR"
-                output_all["return_msg"]={}
-                print output_all
-                return
-
-        global PWD
-        #UseKey,ssh_key
         # 根据总结果输出
         output_all["stat"]="OK"
+        output_all["msg"]=""
         output_all["fail_num"]=0
         # 根据单次执行结果获取
         output_all["failip_list"]=[]
         output_all["return_msg"]={}
+        
+        servers_info = {}
+
+        # 判断输入的 hostgroup 中是否是 IP
+        result = re.findall(r"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b", hosts)
+        if result:
+            # result 是个数组
+            for ip in result:
+                if ip in self.servers_allinfo.keys():
+                    servers_info[ip]=self.servers_allinfo[ip]
+        else:
+            # hostgroup
+            if hosts == "all":
+                servers_info = self.servers_allinfo
+            else:
+                if hosts in self.hostgroup_all.keys():
+                    for ip in self.hostgroup_all[hosts]:
+                        servers_info[ip]=self.servers_allinfo[ip]
+
+        # 检查要获取的机器列表是否为空
+        if not servers_info:
+            output_all["stat"]="ERR"
+            output_all["msg"]="exe failed [%s]" % str(output_all["failip_list"])
+            print output_all
+            return
+
+        global PWD
+        #UseKey,ssh_key
         PWD='cd ~;'
         #----------------------------------------------------------------------------------------------
         # 执行的程序
@@ -1169,34 +1182,49 @@ class Xbatch():
         output_all["fail_num"]=len(output_all["failip_list"])
         if len(output_all["failip_list"]):
             output_all["stat"]="ERR"
+            output_all["msg"]="exe failed [%s]" % str(output_all["failip_list"])
         print json.dumps(output_all,indent=4)
         logger.debug("=====================================================")
         logger.debug("ip_list:%s commands:%s output_all:[%s]"%(str(servers_info.keys()),commands,output_all))
-    def arch_put(self,hostgroup,local_file,remote_dir):
+    def arch_put(self,hosts,local_file,remote_dir):
         '''
-        eg:xb arch_put hostgroup local_file remote_dir
+        eg:xb arch_put hosts local_file remote_dir
         '''
         global output_all
-
-        # 总输出
         output_all = {}
         # 根据总结果输出
         output_all["stat"]="OK"
+        output_all["msg"]=""
         output_all["fail_num"]=0
         # 根据单次执行结果获取
         output_all["failip_list"]=[]
         output_all["return_msg"]={}
-        if hostgroup == "all":
-            servers_info = self.servers_allinfo
-        else:
-            if hostgroup in self.hostgroup_all.keys():
-                servers_info = {}
-                for ip in self.hostgroup_all[hostgroup]:
+        
+        servers_info = {}
+
+        # 判断输入的 hostgroup 中是否是 IP
+        result = re.findall(r"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b", hosts)
+        if result:
+            # result 是个数组
+            for ip in result:
+                if ip in self.servers_allinfo.keys():
                     servers_info[ip]=self.servers_allinfo[ip]
+        else:
+            # hostgroup
+            if hosts == "all":
+                servers_info = self.servers_allinfo
             else:
-                output_all["stat"]="ERR"
-                print output_all
-                return
+                if hosts in self.hostgroup_all.keys():
+                    for ip in self.hostgroup_all[hosts]:
+                        servers_info[ip]=self.servers_allinfo[ip]
+
+        # 检查要获取的机器列表是否为空
+        if not servers_info:
+            output_all["stat"]="ERR"
+            output_all["msg"]="not found the hostgroup or IP [%s]" % hosts
+            print output_all
+            return
+
         for host in servers_info:
             if UseKey == "Y":
                 Upload_file_silent(servers_info[host],local_file,remote_dir,ssh_key=ssh_key)
@@ -1206,6 +1234,7 @@ class Xbatch():
         output_all["fail_num"]=len(output_all["failip_list"])
         if len(output_all["failip_list"]):
             output_all["stat"]="ERR"
+            output_all["msg"]="exe failed [%s]" % str(output_all["failip_list"])
         print json.dumps(output_all,indent=4)
         logger.debug("=====================================================")
         logger.debug("ip_list:%s op:%s output_all:[%s]"%(str(servers_info.keys()),"upload",output_all))
