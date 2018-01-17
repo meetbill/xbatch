@@ -6,7 +6,7 @@
 # (2)主机 servers_allinfo dict
 # (3)运行模式xbatch
 # (3)全局变量output_info
-VERSION=161
+VERSION="1.6.1"
 # system
 import os
 import sys
@@ -341,7 +341,7 @@ def SSH_cmd(host_info,cmd,UseLocalScript,OPTime,show_output=True):
         else:
             FailNumShow="Fail:%d" % (FailNum)
         if show_output:
-            print "+Done (Succ:%d,%s, %0.2fSec X_batch(V:%d) )" % (All_Servers_num_Succ,FailNumShow,time.time()-Global_start_time,VERSION)
+            print "+Done (Succ:%d,%s, %0.2fSec X_batch(V:%s) )" % (All_Servers_num_Succ,FailNumShow,time.time()-Global_start_time,VERSION)
         All_Servers_num =0
         All_Servers_num_Succ=0
         Done_Status='end'
@@ -401,7 +401,7 @@ def Upload_file(host_info,local_file,remote_dir,backup=True):
             FailNumShow="\033[1m\033[1;31mFail:%d\033[1m\033[0m" % (FailNum)
         else:
             FailNumShow="Fail:%d" % (FailNum)
-        print "+Done (Succ:%d,%s, %0.2fSec X_batch(V:%d) )" % (All_Servers_num_Succ,FailNumShow,time.time()-Global_start_time,VERSION)
+        print "+Done (Succ:%d,%s, %0.2fSec X_batch(V:%s) )" % (All_Servers_num_Succ,FailNumShow,time.time()-Global_start_time,VERSION)
         All_Servers_num =0
         All_Servers_num_Succ=0
 def Upload_file_silent(host_info,local_file,remote_dir,ssh_key="",backup=True):
@@ -488,7 +488,7 @@ def Download_file(host_info,remote_file,local_dir):
             FailNumShow="\033[1m\033[1;31mFail:%d\033[1m\033[0m" % (FailNum)
         else:
             FailNumShow="Fail:%d" % (FailNum)   
-        print "+Done (Succ:%d,%s, %0.2fSec X_batch(V:%d))" % (All_Servers_num_Succ,FailNumShow,time.time()-Global_start_time,VERSION)
+        print "+Done (Succ:%d,%s, %0.2fSec X_batch(V:%s))" % (All_Servers_num_Succ,FailNumShow,time.time()-Global_start_time,VERSION)
 def Excute_cmd_root(host_info,cmd,UseLocalScript,OPTime):
     # 获取配置信息
     host_ip=host_info["ip"]
@@ -589,7 +589,7 @@ def Excute_cmd_root(host_info,cmd,UseLocalScript,OPTime):
             FailNumShow="\033[1m\033[1;31mFail:%d\033[1m\033[0m" % (FailNum)
         else:
             FailNumShow="Fail:%d" % (FailNum)
-        print "+Done (Succ:%d,%s, %0.2fSec X_batch(V:%d) )" % (All_Servers_num_Succ,FailNumShow,time.time()-Global_start_time,VERSION)
+        print "+Done (Succ:%d,%s, %0.2fSec X_batch(V:%s) )" % (All_Servers_num_Succ,FailNumShow,time.time()-Global_start_time,VERSION)
         All_Servers_num =0
         All_Servers_num_Succ=0
         Done_Status='end'
@@ -1137,6 +1137,7 @@ class Xbatch():
         output_all["stat"]="OK"
         output_all["msg"]=""
         output_all["fail_num"]=0
+        output_all["version"]=VERSION
         # 根据单次执行结果获取
         output_all["failip_list"]=[]
         output_all["return_msg"]={}
@@ -1196,6 +1197,7 @@ class Xbatch():
         output_all["stat"]="OK"
         output_all["msg"]=""
         output_all["fail_num"]=0
+        output_all["version"]=VERSION
         # 根据单次执行结果获取
         output_all["failip_list"]=[]
         output_all["return_msg"]={}
@@ -1260,6 +1262,7 @@ class Xbatch():
         output_config["stat"]="OK"
         output_config["msg"]=""
         output_config["return_msg"]={}
+        output_all["version"]=VERSION
 
         # 获取主机配置信息
         if operation == "get":
@@ -1303,7 +1306,6 @@ class Xbatch():
                                 continue
                         else:
                             lines.append(line)
-
                 with open(HostsFile,'w') as f:
                     f.write(''.join(lines))
             else:
