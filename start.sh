@@ -7,7 +7,8 @@
 #########################################################################
 
 export LANG=zh_CN.UTF-8
-g_DIR_CUR=$(pwd)
+g_DIR_CUR=`S=\`readlink "$0"\`; [ -z "$S"   ] && S=$0; dirname $S`
+cd ${g_DIR_CUR}
 g_DIR_PACK=${g_DIR_CUR}/Packages
 g_DIR_XBATCH=${g_DIR_PACK}/X_batch
 g_DIR_SOFT=${g_DIR_PACK}/soft
