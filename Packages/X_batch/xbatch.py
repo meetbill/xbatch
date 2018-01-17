@@ -6,7 +6,7 @@
 # (2)主机 servers_allinfo dict
 # (3)运行模式xbatch
 # (3)全局变量output_info
-VERSION="1.6.2"
+VERSION="1.6.3"
 # system
 import os
 import sys
@@ -268,7 +268,7 @@ def SSH_cmd_silent(host_info,cmd,ssh_key=""):
     finally:
         operation = "ssh:%s" % cmd
         exe_time = "%0.2f Sec"%float(time.time()-start_time)
-        logger.debug("op:[%s] ip:[%s] stat:[%s] exe_time:[%s] ssh_mode:[%s] return_msg:[%s] err_info:[%s]" %(operation,ip,exe_stat,exe_time,ssh_mode,output_all["return_msg"][ip],err_info))
+        logger.debug("op:[%s] ip:[%s] user:[%s] port:[%s] sshkey:[%s] stat:[%s] exe_time:[%s] ssh_mode:[%s] return_msg:[%s] err_info:[%s]" %(operation,ip,username,port,ssh_key,exe_stat,exe_time,ssh_mode,output_all["return_msg"][ip],err_info))
 
 def SSH_cmd(host_info,cmd,UseLocalScript,OPTime,show_output=True):
     ip=host_info["ip"]
@@ -451,7 +451,7 @@ def Upload_file_silent(host_info,local_file,remote_dir,ssh_key="",backup=True):
     finally:
         operation="upload:%s --> %s"%(local_file,remote_dir)
         exe_time = "%0.2f Sec"%float(time.time()-start_time)
-        logger.debug("operation:[%s] ip:[%s] stat:[%s] exe_time:[%s] ssh_mode:[%s] return_msg:[%s] err_info:[%s]" %(operation,ip,exe_stat,exe_time,ssh_mode,output_all["return_msg"][ip],err_info))
+        logger.debug("op:[%s] ip:[%s] user:[%s] port:[%s] sshkey:[%s] stat:[%s] exe_time:[%s] ssh_mode:[%s] return_msg:[%s] err_info:[%s]" %(operation,ip,username,port,ssh_key,exe_stat,exe_time,ssh_mode,output_all["return_msg"][ip],err_info))
 
 def Download_file(host_info,remote_file,local_dir):
     ip=host_info["ip"]
@@ -1172,8 +1172,8 @@ class Xbatch():
         PWD='cd ~;'
         #----------------------------------------------------------------------------------------------
         # 执行的程序
-        logger.debug("#####################################################")
-        logger.debug("ip_list:%s commands:%s"%(str(servers_info.keys()),commands))
+        logger.debug("====================================================")
+        logger.debug("Request: ip_list:%s commands:%s"%(str(servers_info.keys()),commands))
         for host in servers_info:
             # 执行程序
             if UseKey == "Y":
@@ -1185,12 +1185,14 @@ class Xbatch():
             output_all["stat"]="ERR"
             output_all["msg"]="exe failed [%s]" % str(output_all["failip_list"])
         print json.dumps(output_all,indent=4)
+        logger.debug("Result ip_list:%s commands:%s output_all:[%s]"%(str(servers_info.keys()),commands,output_all))
         logger.debug("=====================================================")
-        logger.debug("ip_list:%s commands:%s output_all:[%s]"%(str(servers_info.keys()),commands,output_all))
     def arch_put(self,hosts,local_file,remote_dir):
         '''
         eg:xb arch_put hosts local_file remote_dir
         '''
+        logger.debug("#####################################################")
+        logger.debug("Request: arch_put hosts:[%s] [%s]-->[%s]"%(hosts,local_file,remote_dir))
         global output_all
         output_all = {}
         # 根据总结果输出
@@ -1238,8 +1240,8 @@ class Xbatch():
             output_all["stat"]="ERR"
             output_all["msg"]="exe failed [%s]" % str(output_all["failip_list"])
         print json.dumps(output_all,indent=4)
-        logger.debug("=====================================================")
-        logger.debug("ip_list:%s op:%s output_all:[%s]"%(str(servers_info.keys()),"upload",output_all))
+        logger.debug("Result: ip_list:%s op:%s output_all:[%s]"%(str(servers_info.keys()),"upload",output_all))
+        logger.debug("#####################################################")
     def sync(self,local_file):
         '''
         eg:xb sync file
@@ -1257,6 +1259,8 @@ class Xbatch():
         eg:xb hosts set group_name "127.0.0.1 127.0.0.2" root 22
         eg:xb hosts get
         """
+        logger.debug("-----------------------------------------------------")
+        logger.debug("Request: op:[%s] group_name:[%s] ip_list:[%s] user:[%s] port:[%s]"%(operation,group_name,ip_list,user,port))
         output_config = {}
         # 根据总结果输出
         output_config["stat"]="OK"
@@ -1324,10 +1328,18 @@ class Xbatch():
             output_config["stat"]="OK"
             output_config["msg"]=""
             print output_config
+        elif operation == "init":
+            with open(HostsFile,'w') as f:
+                f.write('')
+            output_config["stat"]="OK"
+            output_config["msg"]=""
+            print output_config
         else:
             output_config["stat"]="ERR"
             output_config["msg"]="args error"
             print output_config
+        logger.debug("Result:"+json.dumps(output_config))
+        logger.debug("-----------------------------------------------------")
 
 if  __name__=='__main__':
     xbatch = Xbatch()
