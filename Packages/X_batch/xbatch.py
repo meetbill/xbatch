@@ -6,7 +6,7 @@
 # (2)主机 servers_allinfo dict
 # (3)运行模式xbatch
 # (3)全局变量output_info
-VERSION="1.6.3"
+VERSION="1.6.4"
 # system
 import os
 import sys
@@ -23,7 +23,7 @@ import random
 
 root_path = os.path.split(os.path.realpath(__file__))[0]
 sys.path.insert(0, os.path.join(root_path, 'mylib'))
-os.chdir(root_path)
+#os.chdir(root_path)
 reload(sys)
 sys.setdefaultencoding('utf8')
 
@@ -225,6 +225,7 @@ def SSH_cmd_silent(host_info,cmd,ssh_key=""):
     ResultSum=''
     ResultSumLog=''
     PWD=re.sub("/{2,}","/",PWD)
+    ssh_mode = ""
     try:
         err=None
         ssh=paramiko.SSHClient()
@@ -404,7 +405,7 @@ def Upload_file(host_info,local_file,remote_dir,backup=True):
         print "+Done (Succ:%d,%s, %0.2fSec X_batch(V:%s) )" % (All_Servers_num_Succ,FailNumShow,time.time()-Global_start_time,VERSION)
         All_Servers_num =0
         All_Servers_num_Succ=0
-def Upload_file_silent(host_info,local_file,remote_dir,ssh_key="",backup=True):
+def Upload_file_silent(host_info,local_file,remote_dir,ssh_key="",backup=""):
     '''
     local_file --> remote_dir
     上传文件
@@ -415,6 +416,7 @@ def Upload_file_silent(host_info,local_file,remote_dir,ssh_key="",backup=True):
     port=host_info["port"]
     password=host_info["password"]
     start_time=time.time()
+    ssh_mode = ""
     try:
         t = paramiko.Transport((ip,port))
         if ssh_key:
@@ -449,7 +451,7 @@ def Upload_file_silent(host_info,local_file,remote_dir,ssh_key="",backup=True):
     else:
         t.close()
     finally:
-        operation="upload:%s --> %s"%(local_file,remote_dir)
+        operation="upload:%s --> %s backup:(%s)"%(local_file,remote_dir,backup)
         exe_time = "%0.2f Sec"%float(time.time()-start_time)
         logger.debug("op:[%s] ip:[%s] user:[%s] port:[%s] sshkey:[%s] stat:[%s] exe_time:[%s] ssh_mode:[%s] return_msg:[%s] err_info:[%s]" %(operation,ip,username,port,ssh_key,exe_stat,exe_time,ssh_mode,output_all["return_msg"][ip],err_info))
 
@@ -1131,6 +1133,11 @@ class Xbatch():
         '''
         eg:xb arch_ssh hosts "date"
         '''
+        #----------------------------------------------------------------------------------------------
+        # 执行的程序
+        logger.debug("====================================================")
+        logger.debug("Request: hosts:%s commands:%s"%(hosts,commands))
+
         global output_all
         output_all = {}
         # 根据总结果输出
@@ -1163,17 +1170,15 @@ class Xbatch():
         # 检查要获取的机器列表是否为空
         if not servers_info:
             output_all["stat"]="ERR"
-            output_all["msg"]="exe failed [%s]" % str(output_all["failip_list"])
+            output_all["msg"]="not found ip in [%s]" % hosts
             print output_all
+            logger.debug("Result hosts:%s commands:%s output_all:[%s]"%(hosts,commands,output_all))
+            logger.debug("=====================================================")
             return
 
         global PWD
         #UseKey,ssh_key
         PWD='cd ~;'
-        #----------------------------------------------------------------------------------------------
-        # 执行的程序
-        logger.debug("====================================================")
-        logger.debug("Request: ip_list:%s commands:%s"%(str(servers_info.keys()),commands))
         for host in servers_info:
             # 执行程序
             if UseKey == "Y":
@@ -1185,9 +1190,9 @@ class Xbatch():
             output_all["stat"]="ERR"
             output_all["msg"]="exe failed [%s]" % str(output_all["failip_list"])
         print json.dumps(output_all,indent=4)
-        logger.debug("Result ip_list:%s commands:%s output_all:[%s]"%(str(servers_info.keys()),commands,output_all))
+        logger.debug("Result hosts:%s commands:%s output_all:[%s]"%(hosts,commands,output_all))
         logger.debug("=====================================================")
-    def arch_put(self,hosts,local_file,remote_dir):
+    def arch_put(self,hosts,local_file,remote_dir,backup=""):
         '''
         eg:xb arch_put hosts local_file remote_dir
         '''
@@ -1231,9 +1236,9 @@ class Xbatch():
 
         for host in servers_info:
             if UseKey == "Y":
-                Upload_file_silent(servers_info[host],local_file,remote_dir,ssh_key=ssh_key)
+                Upload_file_silent(servers_info[host],local_file,remote_dir,ssh_key=ssh_key,backup=backup)
             else:
-                Upload_file_silent(servers_info[host],local_file,remote_dir)
+                Upload_file_silent(servers_info[host],local_file,remote_dir,backup=backup)
 
         output_all["fail_num"]=len(output_all["failip_list"])
         if len(output_all["failip_list"]):
